@@ -41,6 +41,15 @@ def money_filter(value):
     return f"{cents(value):,.2f}"
 
 
+@bp.app_template_filter("datetime")
+def datetime_filter(value):
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return value or ""
+    return parsed.astimezone().strftime("%d %b %Y, %H:%M")
+
+
 @bp.app_template_filter("date")
 def date_filter(value):
     try:
@@ -62,6 +71,11 @@ def inject_globals():
 
 
 # ---------------------------------------------------------------- dashboard
+@bp.get("/favicon.ico")
+def favicon():
+    return Response(status=204)
+
+
 @bp.get("/")
 def dashboard():
     today = dt.date.today()
@@ -89,9 +103,10 @@ def dashboard():
                 overdue += total
                 overdue_count += 1
     recent = rows[:8]
+    overdue_rows = [r for r in rows if inv.effective_status(r, today) == "overdue"][:5]
     return render_template("dashboard.html", month_total=month_total, outstanding=outstanding,
                            paid=paid, paid_count=paid_count, overdue=overdue,
-                           overdue_count=overdue_count, recent=recent,
+                           overdue_count=overdue_count, recent=recent, overdue_rows=overdue_rows,
                            has_demo=bool(g.db.execute("SELECT 1 FROM clients WHERE is_demo=1").fetchone()),
                            setup_ok=bool(settings()["business_name"]) and mailer.is_configured())
 

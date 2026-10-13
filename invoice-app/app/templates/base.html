@@ -3,36 +3,62 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Invoices{% endblock %} · Invoicing</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <title>{% block title %}Invoices{% endblock %} · {{ business_name or 'Invoicing' }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='vendor/motion.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
-<body>
-<div class="shell">
-  <aside class="sidebar">
-    <a class="brand" href="{{ url_for('web.dashboard') }}">
-      <span class="brand-mark">▲</span><span>{{ business_name or 'Invoicing' }}</span>
-    </a>
-    <nav>
-      {% set nav = [('web.dashboard','Dashboard','dashboard'), ('web.invoice_list','Invoices','invoices'),
-                    ('web.clients','Clients','clients'), ('web.services','Services & pricing','services'),
-                    ('web.templates_page','Templates','templates'), ('web.settings_page','Business settings','settings')] %}
-      {% for endpoint, label, key in nav %}
-        <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint and (request.endpoint == endpoint or (key == 'invoices' and request.endpoint in ('web.invoice_detail','web.invoice_edit'))) }}">{{ label }}</a>
-      {% endfor %}
-    </nav>
-    <div class="sidebar-foot">
-      {% if mail_ready %}<span class="dot ok"></span> Email connected{% else %}<span class="dot warn"></span> <a href="{{ url_for('web.settings_page') }}">Connect email</a>{% endif %}
-    </div>
+<body class="min-h-dvh">
+{% from "ui.html" import icon, nav_icon %}
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-[var(--shadow-pop)]">Skip to content</a>
+
+<div class="flex min-h-dvh">
+  <!-- Sidebar (desktop) -->
+  <aside class="hidden w-60 shrink-0 flex-col border-r border-border bg-background px-3 py-5 lg:flex" aria-label="Main">
+    {% include "partials/nav.html" %}
   </aside>
-  <main class="main">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}<div class="flash flash-{{ cat }}" role="status">{{ msg }}</div>{% endfor %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+
+  <!-- Mobile navigation drawer -->
+  <div id="mobile-nav" class="fixed inset-0 z-50 lg:hidden" hidden>
+    <div class="absolute inset-0 bg-foreground/30" data-close-nav></div>
+    <aside class="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-background px-3 py-5 shadow-[var(--shadow-pop)]" role="dialog" aria-modal="true" aria-label="Navigation">
+      <div class="mb-2 flex justify-end"><button class="rounded-md p-2 hover:bg-muted" data-close-nav aria-label="Close navigation">{{ icon('x') }}</button></div>
+      {% include "partials/nav.html" %}
+    </aside>
+  </div>
+
+  <div class="flex min-w-0 flex-1 flex-col">
+    <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur sm:px-6">
+      <button class="rounded-md p-2 hover:bg-muted lg:hidden" data-open-nav aria-label="Open navigation" aria-controls="mobile-nav">{{ icon('menu') }}</button>
+      <div class="min-w-0 flex-1 truncate text-sm text-muted-foreground">{% block crumbs %}{% endblock %}</div>
+      <a href="{{ url_for('web.settings_page') }}" class="hidden items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground sm:flex">
+        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">{{ (business_name or 'I')[:1]|upper }}</span>
+        <span class="max-w-[12rem] truncate">{{ business_name or 'Set up your business' }}</span>
+      </a>
+    </header>
+
+    <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8" tabindex="-1">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </div>
-<div class="mobile-bar" hidden id="mobile-bar"></div>
+
+<!-- Toasts from flash messages -->
+<div id="toasts" class="pointer-events-none fixed bottom-4 right-4 left-4 z-[70] flex flex-col items-end gap-2 sm:left-auto" aria-live="polite" aria-atomic="false">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="toast pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-pop)]" data-toast role="status">
+        <span class="mt-0.5 shrink-0 {{ 'text-success' if cat == 'success' else 'text-destructive' if cat == 'error' else 'text-info' }}">{{ icon('check' if cat == 'success' else 'alert' if cat == 'error' else 'info') }}</span>
+        <p class="min-w-0 flex-1 text-foreground">{{ msg }}</p>
+        <button class="rounded p-0.5 text-muted-foreground hover:text-foreground" data-dismiss-toast aria-label="Dismiss">{{ icon('x') }}</button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+</div>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,35 +1,36 @@
 {% extends "base.html" %}
-{% from "macros.html" import badge %}
+{% from "ui.html" import page_header, btn, icon, badge, empty %}
 {% block title %}{{ client['name'] }}{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.clients') }}">Clients</a> <span class="mx-1">/</span> <span class="text-foreground">{{ client['name'] }}</span>{% endblock %}
 {% block content %}
-<header class="page-head">
-  <div><p class="muted small"><a href="{{ url_for('web.clients') }}">Clients</a></p><h1>{{ client['name'] }}</h1>
-    <p class="muted">{{ client['email'] }}</p></div>
-  <div class="row-gap">
-    <a class="btn" href="{{ url_for('web.client_form', client_id=client['id']) }}">Edit</a>
-    <form method="post" action="{{ url_for('web.invoice_new') }}">
-      <button class="btn btn-primary" type="submit" data-once>New invoice</button>
-    </form>
-  </div>
-</header>
-<div class="detail-grid">
-  <section class="card"><h2>Billing details</h2>
-    <p class="pre small">{{ client['billing_address'] or 'No billing address.' }}</p>
-    {% if client['registration_no'] %}<p class="small">Reg. no: {{ client['registration_no'] }}</p>{% endif %}
-    {% if client['vat_number'] %}<p class="small">VAT no: {{ client['vat_number'] }}</p>{% endif %}
-    <p class="small muted">Outstanding: {{ outstanding|money }}</p>
+{% call page_header(client['name'], client['email']) %}
+  <a class="{{ btn('secondary') }}" href="{{ url_for('web.client_form', client_id=client['id']) }}">{{ icon('edit') }} Edit</a>
+  <form method="post" action="{{ url_for('web.invoice_new') }}"><button class="{{ btn('primary') }}" type="submit" data-once>{{ icon('plus') }} New invoice</button></form>
+{% endcall %}
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="card space-y-3 self-start p-5">
+    <h2 class="text-sm font-semibold">Billing details</h2>
+    <p class="whitespace-pre-line text-sm text-muted-foreground">{{ client['billing_address'] or 'No billing address.' }}</p>
+    {% if client['registration_no'] %}<p class="text-sm"><span class="text-muted-foreground">Reg. no.</span> {{ client['registration_no'] }}</p>{% endif %}
+    {% if client['vat_number'] %}<p class="text-sm"><span class="text-muted-foreground">VAT no.</span> {{ client['vat_number'] }}</p>{% endif %}
+    <div class="border-t border-border pt-3 text-sm"><span class="text-muted-foreground">Awaiting payment</span> <span class="num ml-2 font-semibold">{{ outstanding|money }}</span></div>
   </section>
-  <section class="card"><h2>Invoices</h2>
-    <div class="table-wrap"><table class="table compact">
-      <thead><tr><th>Number</th><th>Issued</th><th class="num">Total</th><th>Status</th></tr></thead>
-      <tbody>
-      {% for r in invoices %}
-        <tr><td><a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }}</a></td>
-            <td>{{ r['issue_date']|date }}</td><td class="num">{{ r['total']|money }}</td>
-            <td>{{ badge(effective(r)) }}</td></tr>
-      {% else %}<tr><td colspan="4" class="muted">No invoices yet.</td></tr>{% endfor %}
-      </tbody>
-    </table></div>
+  <section class="card min-w-0 overflow-hidden lg:col-span-2">
+    <div class="border-b border-border px-5 py-3.5"><h2 class="text-sm font-semibold">Invoices</h2></div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-muted/60 text-left text-xs text-muted-foreground"><tr><th class="px-5 py-2.5 font-medium">Number</th><th class="px-3 py-2.5 font-medium">Issued</th><th class="px-3 py-2.5 text-right font-medium">Total</th><th class="px-5 py-2.5 font-medium">Status</th></tr></thead>
+        <tbody class="divide-y divide-border">
+        {% for r in invoices %}
+          <tr class="hover:bg-muted/40"><td class="px-5 py-3"><a class="font-medium hover:underline" href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }}</a></td>
+            <td class="px-3 py-3 whitespace-nowrap">{{ r['issue_date']|date }}</td><td class="num px-3 py-3">{{ r['total']|money }}</td>
+            <td class="px-5 py-3">{{ badge(effective(r)) }}</td></tr>
+        {% else %}
+          <tr><td colspan="4">{% call empty("No invoices for this client yet") %}{% endcall %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </section>
 </div>
 {% endblock %}

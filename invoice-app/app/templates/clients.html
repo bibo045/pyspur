@@ -1,31 +1,55 @@
 {% extends "base.html" %}
+{% from "ui.html" import page_header, btn, icon, empty %}
 {% block title %}Clients{% endblock %}
 {% block content %}
-<header class="page-head"><h1>Clients</h1><a class="btn btn-primary" href="{{ url_for('web.client_form') }}">Add client</a></header>
-<form class="toolbar" method="get">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search name or email" aria-label="Search clients">
-  <label class="inline-check"><input type="checkbox" name="archived" value="1" {{ 'checked' if show_archived }} onchange="this.form.submit()"> Show archived</label>
-  <button class="btn" type="submit">Search</button>
-</form>
-<section class="card"><div class="table-wrap"><table class="table">
-  <thead><tr><th>Name</th><th>Email</th><th>VAT no.</th><th class="actions">Actions</th></tr></thead>
-  <tbody>
-  {% for c in rows %}
-    <tr>
-      <td><a href="{{ url_for('web.client_detail', client_id=c['id']) }}">{{ c['name'] }}</a></td>
-      <td>{{ c['email'] }}</td>
-      <td>{{ c['vat_number'] or '—' }}</td>
-      <td class="actions">
-        <a href="{{ url_for('web.client_form', client_id=c['id']) }}">Edit</a>
-        <form method="post" action="{{ url_for('web.client_archive', client_id=c['id']) }}" class="inline">
-          <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
-          <button class="link" type="submit">{{ 'Restore' if show_archived else 'Archive' }}</button>
-        </form>
-      </td>
-    </tr>
-  {% else %}
-    <tr><td colspan="4"><div class="empty">{{ 'No archived clients.' if show_archived else 'No clients yet. Add one to start invoicing.' }}</div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></section>
+{% call page_header("Clients", "Saved billing details for the people you invoice.") %}
+  <a class="{{ btn('primary') }}" href="{{ url_for('web.client_form') }}">{{ icon('plus') }} Add client</a>
+{% endcall %}
+
+<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <form method="get" role="search" class="relative w-full sm:max-w-xs">
+    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{{ icon('search', 'h-4 w-4') }}</span>
+    <input class="field pl-9" type="search" name="q" value="{{ q }}" placeholder="Search name or email" aria-label="Search clients">
+    {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
+  </form>
+  <a class="{{ btn('ghost', 'sm') }}" href="{{ url_for('web.clients', q=q, archived='0' if show_archived else '1') }}">{{ 'Show active clients' if show_archived else 'Show archived' }}</a>
+</div>
+
+<section class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-muted/60 text-left text-xs text-muted-foreground">
+        <tr><th class="px-5 py-2.5 font-medium">Name</th><th class="px-3 py-2.5 font-medium">Email</th><th class="px-3 py-2.5 font-medium">VAT no.</th><th class="px-5 py-2.5 text-right font-medium"><span class="sr-only">Actions</span></th></tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+      {% for c in rows %}
+        <tr class="hover:bg-muted/40">
+          <td class="px-5 py-3 font-medium"><a class="hover:underline" href="{{ url_for('web.client_detail', client_id=c['id']) }}">{{ c['name'] }}</a></td>
+          <td class="px-3 py-3 text-muted-foreground">{{ c['email'] }}</td>
+          <td class="px-3 py-3 text-muted-foreground">{{ c['vat_number'] or '—' }}</td>
+          <td class="px-5 py-2 text-right whitespace-nowrap">
+            {% if not show_archived %}<a class="{{ btn('ghost', 'sm') }}" href="{{ url_for('web.client_form', client_id=c['id']) }}">Edit</a>{% endif %}
+            <button class="{{ btn('ghost', 'sm') }}" data-dialog-open="arch-{{ c['id'] }}">{{ 'Restore' if show_archived else 'Archive' }}</button>
+            <dialog id="arch-{{ c['id'] }}" class="m-auto w-[min(92vw,26rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-left text-foreground shadow-[var(--shadow-pop)]">
+              <form method="post" action="{{ url_for('web.client_archive', client_id=c['id']) }}" class="flex flex-col gap-4 p-5" data-once>
+                <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
+                <div class="space-y-1.5"><h2 class="text-base font-semibold">{{ 'Restore' if show_archived else 'Archive' }} {{ c['name'] }}?</h2>
+                  <p class="text-sm text-muted-foreground">{{ 'The client appears in the active list again.' if show_archived else 'Archived clients are hidden from new invoices. Their past invoices are kept.' }}</p></div>
+                <div class="flex justify-end gap-2"><button type="button" class="{{ btn('secondary') }}" data-dialog-close>Cancel</button>
+                  <button type="submit" class="{{ btn('primary') if show_archived else btn('destructive') }}">{{ 'Restore' if show_archived else 'Archive' }}</button></div>
+              </form>
+            </dialog>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4">
+          {% call empty("No archived clients" if show_archived else "No clients yet", "" if show_archived else "Add a client to start invoicing.") %}
+            {% if not show_archived %}<a class="{{ btn('primary') }}" href="{{ url_for('web.client_form') }}">Add client</a>{% endif %}
+          {% endcall %}
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

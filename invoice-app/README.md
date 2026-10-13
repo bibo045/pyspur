@@ -8,8 +8,13 @@ Built with Flask, SQLite, Python `Decimal` for all money, ReportLab for PDFs, an
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
+npm install && npm run build        # compiles the stylesheet and copies Motion
 python run.py                       # http://127.0.0.1:5000
 ```
+
+The compiled stylesheet (`app/static/css/app.css`) and `app/static/vendor/motion.js` are committed, so the Python side runs without Node. Node is only needed to change styles.
+
+The visual system is described in [DESIGN.md](DESIGN.md).
 
 Data is stored in `data/invoices.sqlite3`, PDFs in `data/pdfs/`, and logos in `data/uploads/`.
 Set `INVOICE_DB` to use a different database file.
@@ -93,4 +98,6 @@ app/
   templates/            HTML pages
   static/               CSS (design tokens) and editor.js
 tests/                  pytest suite
+package.json            Tailwind v4 and Motion build
+DESIGN.md               design direction, tokens, page structure
 ```

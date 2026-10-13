@@ -1,0 +1,30 @@
+{% from "ui.html" import nav_icon %}
+<a href="{{ url_for('web.dashboard') }}" class="mb-6 flex items-center gap-2 px-2 font-semibold tracking-tight">
+  <span class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-sm text-primary-foreground font-display">L</span>
+  <span class="font-display text-lg leading-none">Ledger</span>
+</a>
+{% set active = request.endpoint or '' %}
+<nav class="flex flex-col gap-0.5">
+  {% for endpoint, label, icon_name, match in [
+      ('web.dashboard', 'Dashboard', 'home', ['web.dashboard']),
+      ('web.invoice_list', 'Invoices', 'file', ['web.invoice_list','web.invoice_detail','web.invoice_edit']),
+      ('web.clients', 'Clients', 'users', ['web.clients','web.client_form','web.client_detail']),
+      ('web.services', 'Services', 'tag', ['web.services','web.service_form']),
+      ('web.templates_page', 'Templates', 'layout', ['web.templates_page']),
+      ('web.settings_page', 'Settings', 'settings', ['web.settings_page'])] %}
+    {% set is_active = active in match %}
+    <a href="{{ url_for(endpoint) }}"
+       class="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors {{ 'bg-surface font-medium text-foreground shadow-[var(--shadow-card)] ring-1 ring-border' if is_active else 'text-muted-foreground hover:bg-muted hover:text-foreground' }}"
+       {{ 'aria-current="page"' if is_active }}>
+      {{ nav_icon(icon_name) }}
+      {{ label }}
+    </a>
+  {% endfor %}
+</nav>
+<div class="mt-auto px-2.5 pt-6 text-xs">
+  {% if mail_ready %}
+    <span class="inline-flex items-center gap-2 text-muted-foreground"><span class="h-1.5 w-1.5 rounded-full bg-success"></span>Email connected</span>
+  {% else %}
+    <a href="{{ url_for('web.settings_page') }}#email" class="inline-flex items-center gap-2 text-warning hover:underline"><span class="h-1.5 w-1.5 rounded-full bg-warning"></span>Connect email to send</a>
+  {% endif %}
+</div>

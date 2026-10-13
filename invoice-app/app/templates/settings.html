@@ -1,95 +1,139 @@
 {% extends "base.html" %}
-{% block title %}Business settings{% endblock %}
+{% from "ui.html" import page_header, btn, icon %}
+{% block title %}Settings{% endblock %}
 {% block content %}
-<header class="page-head"><h1>Business settings</h1></header>
+{% call page_header("Settings", "Your business details, numbering, bank account and email.") %}{% endcall %}
 
-<section class="card setup">
-  <h2>Setup checklist</h2>
-  <ul class="checklist">
-    <li class="{{ 'done' if s['business_name'] }}">Business name and address</li>
-    <li class="{{ 'done' if s['bank_iban'] }}">Bank account for payment instructions</li>
-    <li class="{{ 'done' if mail_ready }}">Email provider connected (server environment variables)</li>
-  </ul>
-  <details class="env-help" {{ '' if mail_ready else 'open' }}>
-    <summary>Connect email delivery</summary>
-    <p class="small">Set these on the server (never in the browser). Any SMTP provider works: Amazon SES, Postmark, SendGrid, Mailgun, Resend, or Gmail with an app password.</p>
-    <pre class="code">SMTP_HOST=smtp.yourprovider.com
+<!-- Setup status -->
+<section class="card mb-6 p-5" aria-labelledby="setup-h">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h2 id="setup-h" class="text-sm font-semibold">Setup</h2>
+      <ul class="mt-3 space-y-1.5 text-sm">
+        <li class="flex items-center gap-2 {{ 'text-foreground' if s['business_name'] else 'text-muted-foreground' }}">{{ icon('check-circle' if s['business_name'] else 'clock', 'h-4 w-4 ' ~ ('text-success' if s['business_name'] else 'text-muted-foreground')) }} Business name and address</li>
+        <li class="flex items-center gap-2 {{ 'text-foreground' if s['bank_iban'] else 'text-muted-foreground' }}">{{ icon('check-circle' if s['bank_iban'] else 'clock', 'h-4 w-4 ' ~ ('text-success' if s['bank_iban'] else 'text-muted-foreground')) }} Bank account for payment instructions</li>
+        <li class="flex items-center gap-2 {{ 'text-foreground' if mail_ready else 'text-muted-foreground' }}">{{ icon('check-circle' if mail_ready else 'clock', 'h-4 w-4 ' ~ ('text-success' if mail_ready else 'text-muted-foreground')) }} Email provider connected</li>
+      </ul>
+    </div>
+    <a class="{{ btn('secondary', 'sm') }} shrink-0" href="#email">Connect email</a>
+  </div>
+</section>
+
+<div class="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+  <nav class="flex gap-1 overflow-x-auto lg:flex-col" role="tablist" aria-label="Settings sections" data-tabs>
+    {% for key, label in [('business','Business'),('invoicing','Invoicing'),('payment','Bank & payment'),('email','Email'),('data','Demo data')] %}
+    <button type="button" role="tab" data-tab-target="{{ key }}" id="tab-{{ key }}" aria-controls="{{ key }}"
+      aria-selected="false" tabindex="-1"
+      class="whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:border-l-2 lg:rounded-none lg:rounded-r-md border-transparent">{{ label }}</button>
+    {% endfor %}
+  </nav>
+
+  <div class="min-w-0">
+    <!-- All business fields submit together -->
+    <form method="post" enctype="multipart/form-data" class="space-y-6" data-once>
+      <section id="business" role="tabpanel" aria-labelledby="tab-business" class="card space-y-5 p-6" hidden>
+        <h2 class="text-sm font-semibold">Your business</h2>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <label class="space-y-1.5 sm:col-span-2"><span class="label">Business name</span><input class="field" name="business_name" value="{{ s['business_name'] }}" maxlength="150"></label>
+          <label class="space-y-1.5"><span class="label">Contact email</span><input class="field" type="email" name="business_email" value="{{ s['business_email'] }}" maxlength="254"></label>
+          <label class="space-y-1.5"><span class="label">Phone</span><input class="field" name="business_phone" value="{{ s['business_phone'] }}" maxlength="60"></label>
+          <label class="space-y-1.5 sm:col-span-2"><span class="label">Address</span><textarea class="field" name="business_address" rows="3" maxlength="500">{{ s['business_address'] }}</textarea></label>
+          <label class="space-y-1.5"><span class="label">Registration no.</span><input class="field" name="registration_no" value="{{ s['registration_no'] }}" maxlength="60"></label>
+          <label class="space-y-1.5"><span class="label">VAT no.</span><input class="field" name="vat_number" value="{{ s['vat_number'] }}" maxlength="60"></label>
+          <label class="space-y-1.5 sm:col-span-2"><span class="label">Logo <span class="font-normal">(PNG or JPG)</span></span>
+            <input class="field file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2.5 file:py-1 file:text-sm" type="file" name="logo" accept="image/png,image/jpeg">
+            {% if s['logo_path'] %}<span class="text-xs text-muted-foreground">A logo is set. Uploading another replaces it.</span>{% endif %}</label>
+        </div>
+      </section>
+
+      <section id="invoicing" role="tabpanel" aria-labelledby="tab-invoicing" class="card space-y-5 p-6" hidden>
+        <h2 class="text-sm font-semibold">Invoicing</h2>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <label class="space-y-1.5"><span class="label">Currency</span><input class="field uppercase" name="currency" value="{{ s['currency'] }}" maxlength="3" pattern="[A-Za-z]{3}"></label>
+          <label class="space-y-1.5"><span class="label">Default VAT rate (%)</span><input class="field num" name="default_vat_rate" inputmode="decimal" value="{{ s['default_vat_rate'] }}"></label>
+          <label class="space-y-1.5"><span class="label">Number prefix</span><input class="field" name="invoice_prefix" value="{{ s['invoice_prefix'] }}" maxlength="20"></label>
+          <label class="space-y-1.5"><span class="label">Next number</span><input class="field num" name="invoice_next_number" inputmode="numeric" value="{{ s['invoice_next_number'] }}"></label>
+          <label class="space-y-1.5"><span class="label">Digits</span><input class="field num" name="invoice_pad" inputmode="numeric" value="{{ s['invoice_pad'] }}"></label>
+          <label class="space-y-1.5"><span class="label">Payment terms (days)</span><input class="field num" name="payment_terms_days" inputmode="numeric" value="{{ s['payment_terms_days'] }}"></label>
+        </div>
+        <p class="rounded-md bg-muted px-3 py-2 text-sm">Next invoice: <span class="num font-medium">{{ s['invoice_prefix'] }}{{ s['invoice_next_number'].zfill(s['invoice_pad']|int) }}</span>. Numbers are assigned at finalization, so drafts never leave gaps.</p>
+        <label class="space-y-1.5 block"><span class="label">Legal footer</span><textarea class="field" name="legal_footer" rows="2" maxlength="1000" placeholder="Company registration, registered office, VAT wording">{{ s['legal_footer'] }}</textarea></label>
+      </section>
+
+      <section id="payment" role="tabpanel" aria-labelledby="tab-payment" class="card space-y-5 p-6" hidden>
+        <h2 class="text-sm font-semibold">Bank and payment</h2>
+        <label class="space-y-1.5 block"><span class="label">Bank name</span><input class="field" name="bank_name" value="{{ s['bank_name'] }}" maxlength="100"></label>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <label class="space-y-1.5"><span class="label">IBAN</span><input class="field font-mono text-[13px]" name="bank_iban" value="{{ s['bank_iban'] }}" maxlength="50"></label>
+          <label class="space-y-1.5"><span class="label">BIC</span><input class="field font-mono text-[13px]" name="bank_bic" value="{{ s['bank_bic'] }}" maxlength="20"></label>
+        </div>
+        <label class="space-y-1.5 block"><span class="label">Payment instructions</span><textarea class="field" name="payment_instructions" rows="2" maxlength="1000">{{ s['payment_instructions'] }}</textarea></label>
+      </section>
+
+      <section id="email" role="tabpanel" aria-labelledby="tab-email" class="card space-y-5 p-6" hidden>
+        <h2 class="text-sm font-semibold">Default email</h2>
+        <label class="space-y-1.5 block"><span class="label">Subject</span><input class="field" name="email_subject" value="{{ s['email_subject'] }}" maxlength="300"></label>
+        <label class="space-y-1.5 block"><span class="label">Message</span><textarea class="field" name="email_body" rows="7" maxlength="4000">{{ s['email_body'] }}</textarea></label>
+        <p class="text-xs text-muted-foreground">Placeholders: {client_name} {number} {total} {due_date} {business_name}</p>
+      </section>
+
+      <div id="save-bar" class="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-surface/95 px-4 py-3 shadow-[var(--shadow-card)] backdrop-blur" hidden>
+        <span class="text-sm text-muted-foreground">Business details, numbering and bank fields save together.</span>
+        <button class="{{ btn('primary') }}" type="submit">Save settings</button>
+      </div>
+    </form>
+
+    <section id="data" role="tabpanel" aria-labelledby="tab-data" class="card mt-6 space-y-4 p-6" hidden>
+      <h2 class="text-sm font-semibold">Demo data</h2>
+      <p class="text-sm text-muted-foreground">Sample clients, services and invoices to explore the app. They are labelled Demo, never send email, and can be removed in one step. Your records are not changed.</p>
+      <form method="post" action="{{ url_for('web.settings_demo') }}">
+        <input type="hidden" name="action" value="{{ 'clear' if has_demo else 'add' }}">
+        <button class="{{ btn('secondary') }}" type="submit" data-once>{{ 'Remove demo data' if has_demo else 'Add demo data' }}</button>
+      </form>
+    </section>
+
+    <section class="card mt-6 space-y-4 p-6" aria-labelledby="mail-h">
+      <h2 id="mail-h" class="text-sm font-semibold">Email connection</h2>
+      <p class="text-sm text-muted-foreground">Credentials are read from server environment variables and are never shown here. Set these before the first send:</p>
+      <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs leading-relaxed"><code>SMTP_HOST=smtp.yourprovider.com
 SMTP_PORT=587
-SMTP_SECURITY=starttls    # starttls | ssl | none
+SMTP_SECURITY=starttls   # starttls | ssl | none
 SMTP_USERNAME=...
 SMTP_PASSWORD=...
-SMTP_FROM="Your Business &lt;billing@yourdomain.com&gt;"</pre>
-    <p class="small">Status: {% for k, v in mail.items() %}<span class="pill {{ 'ok' if v else 'off' }}">{{ k }}</span> {% endfor %}</p>
-    {% if mail_ready and s['business_email'] %}
-    <form method="post" action="{{ url_for('web.settings_test_email') }}"><button class="btn" type="submit">Send a test email to {{ s['business_email'] }}</button></form>
-    {% endif %}
-  </details>
-</section>
-
-<form method="post" enctype="multipart/form-data" class="settings-grid">
-  <section class="card stack-sm">
-    <h2>Your business</h2>
-    <label>Business name <input name="business_name" value="{{ s['business_name'] }}" maxlength="150"></label>
-    <label>Contact email <input name="business_email" type="email" value="{{ s['business_email'] }}" maxlength="254"></label>
-    <label>Phone <input name="business_phone" value="{{ s['business_phone'] }}" maxlength="60"></label>
-    <label>Address <textarea name="business_address" rows="3" maxlength="500">{{ s['business_address'] }}</textarea></label>
-    <div class="grid-2">
-      <label>Registration no. <input name="registration_no" value="{{ s['registration_no'] }}" maxlength="60"></label>
-      <label>VAT no. <input name="vat_number" value="{{ s['vat_number'] }}" maxlength="60"></label>
-    </div>
-    <label>Logo (PNG or JPG) <input type="file" name="logo" accept="image/png,image/jpeg">
-      {% if s['logo_path'] %}<span class="muted small">A logo is set.</span>{% endif %}</label>
-  </section>
-
-  <section class="card stack-sm">
-    <h2>Invoicing</h2>
-    <div class="grid-2">
-      <label>Currency <input name="currency" value="{{ s['currency'] }}" maxlength="3" pattern="[A-Za-z]{3}"></label>
-      <label>Default VAT rate (%) <input name="default_vat_rate" inputmode="decimal" value="{{ s['default_vat_rate'] }}"></label>
-    </div>
-    <div class="grid-3">
-      <label>Number prefix <input name="invoice_prefix" value="{{ s['invoice_prefix'] }}" maxlength="20"></label>
-      <label>Next number <input name="invoice_next_number" inputmode="numeric" value="{{ s['invoice_next_number'] }}"></label>
-      <label>Digits <input name="invoice_pad" inputmode="numeric" value="{{ s['invoice_pad'] }}"></label>
-    </div>
-    <p class="muted small">Next invoice: {{ s['invoice_prefix'] }}{{ s['invoice_next_number'].zfill(s['invoice_pad']|int) }}. Numbers are assigned at finalization, so drafts never leave gaps.</p>
-    <label>Payment terms (days) <input name="payment_terms_days" inputmode="numeric" value="{{ s['payment_terms_days'] }}"></label>
-    <label>Legal footer <textarea name="legal_footer" rows="2" maxlength="1000" placeholder="Company registration, registered office, VAT reverse-charge wording...">{{ s['legal_footer'] }}</textarea></label>
-  </section>
-
-  <section class="card stack-sm">
-    <h2>Bank &amp; payment</h2>
-    <label>Bank name <input name="bank_name" value="{{ s['bank_name'] }}" maxlength="100"></label>
-    <div class="grid-2">
-      <label>IBAN <input name="bank_iban" value="{{ s['bank_iban'] }}" maxlength="50"></label>
-      <label>BIC <input name="bank_bic" value="{{ s['bank_bic'] }}" maxlength="20"></label>
-    </div>
-    <label>Payment instructions <textarea name="payment_instructions" rows="2" maxlength="1000">{{ s['payment_instructions'] }}</textarea></label>
-  </section>
-
-  <section class="card stack-sm">
-    <h2>Default email</h2>
-    <label>Subject <input name="email_subject" value="{{ s['email_subject'] }}" maxlength="300"></label>
-    <label>Message <textarea name="email_body" rows="7" maxlength="4000">{{ s['email_body'] }}</textarea></label>
-    <p class="muted small">Placeholders: {client_name} {number} {total} {due_date} {business_name}</p>
-  </section>
-
-  <div class="settings-save"><button class="btn btn-primary btn-lg" type="submit">Save settings</button></div>
-</form>
-
-<section class="card">
-  <h2>Demo data</h2>
-  <p class="small muted">Sample clients, services and invoices to explore the app. They are labelled Demo, never send email, and are removed in one click. Your records are never modified.</p>
-  <form method="post" action="{{ url_for('web.settings_demo') }}">
-    <input type="hidden" name="action" value="{{ 'clear' if has_demo else 'add' }}">
-    <button class="btn" type="submit">{{ 'Remove demo data' if has_demo else 'Add demo data' }}</button>
-  </form>
-</section>
-
-<section class="card">
-  <h2>Recent email activity</h2>
-  {% for e in emails %}
-    <p class="small"><span class="muted">{{ e['attempted_at'] }}</span> · {{ e['status'] }} · {{ e['recipient'] }}{% if e['error'] %} — <span class="error">{{ e['error'] }}</span>{% endif %}</p>
-  {% else %}<p class="muted small">No emails sent yet.</p>{% endfor %}
-</section>
+SMTP_FROM="Your Business &lt;billing@yourdomain.com&gt;"</code></pre>
+      <div class="flex flex-wrap gap-2">
+        {% for k, v in mail.items() %}
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs {{ 'text-success' if v else 'text-muted-foreground' }}">{{ icon('check' if v else 'x', 'h-3 w-3') }} {{ k }}</span>
+        {% endfor %}
+      </div>
+      <div class="flex items-center justify-between gap-3 border-t border-border pt-4">
+        <p class="text-sm {{ 'text-success' if mail_ready else 'text-warning' }}">{{ 'Email is connected.' if mail_ready else 'Email is not connected yet.' }}</p>
+        {% if mail_ready and s['business_email'] %}
+        <form method="post" action="{{ url_for('web.settings_test_email') }}"><button class="{{ btn('secondary', 'sm') }}" type="submit" data-once>{{ icon('mail') }} Send test email</button></form>
+        {% endif %}
+      </div>
+      <div class="border-t border-border pt-4">
+        <h3 class="mb-2 text-xs font-medium text-muted-foreground">Recent email activity</h3>
+        <ul class="space-y-2 text-sm">
+          {% for e in emails %}
+            <li class="flex flex-wrap gap-x-2"><span class="text-muted-foreground">{{ e['attempted_at']|datetime }}</span> <span class="{{ 'text-success' if e['status'] == 'sent' else 'text-destructive' }} font-medium">{{ 'Sent' if e['status'] == 'sent' else 'Failed' }}</span> {{ e['recipient'] }}{% if e['error'] %} <span class="text-destructive">— {{ e['error'] }}</span>{% endif %}</li>
+          {% else %}<li class="text-muted-foreground">No emails sent yet.</li>{% endfor %}
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  // Show the save bar only after a change, so the page is calm until someone edits.
+  const form = document.querySelector("form[enctype]");
+  const bar = document.getElementById("save-bar");
+  if (form && bar) {
+    form.addEventListener("input", () => { bar.hidden = false; });
+    form.addEventListener("change", () => { bar.hidden = false; });
+  }
+})();
+</script>
 {% endblock %}

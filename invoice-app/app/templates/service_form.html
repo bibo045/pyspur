@@ -1,23 +1,29 @@
 {% extends "base.html" %}
+{% from "ui.html" import page_header, btn %}
 {% block title %}{{ 'Edit service' if svc else 'New service' }}{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.services') }}">Services</a> <span class="mx-1">/</span> <span class="text-foreground">{{ 'Edit' if svc else 'New' }}</span>{% endblock %}
 {% block content %}
-<header class="page-head"><h1>{{ 'Edit service' if svc else 'New service' }}</h1></header>
-<form method="post" class="card form-narrow stack-sm" novalidate>
-  <label>Service name <input name="name" value="{{ values.get('name', '') }}" required maxlength="150">
-    {% if errors.get('name') %}<span class="error small">{{ errors['name'] }}</span>{% endif %}</label>
-  <label>Description <textarea name="description" rows="2" maxlength="500">{{ values.get('description', '') }}</textarea></label>
-  <div class="grid-2">
-    <label>Unit price <input name="unit_price" inputmode="decimal" value="{{ values.get('unit_price', '') }}" required>
-      {% if errors.get('price') %}<span class="error small">{{ errors['price'] }}</span>{% endif %}</label>
-    <label>Default unit
-      <select name="unit">
-        {% for u in ['fixed fee', 'hours', 'days', 'units', 'months'] %}
-          <option {{ 'selected' if values.get('unit') == u }}>{{ u }}</option>
-        {% endfor %}
+{% call page_header('Edit service' if svc else 'New service', 'The defaults you set here fill in every time you add this service to an invoice.') %}{% endcall %}
+<form method="post" class="card mx-auto max-w-2xl space-y-5 p-6" novalidate data-once>
+  <label class="space-y-1.5 block"><span class="label">Service name</span>
+    <input class="field" name="name" value="{{ values.get('name', '') }}" required maxlength="150" {{ 'aria-invalid="true"' if errors.get('name') }}>
+    {% if errors.get('name') %}<span class="text-xs text-destructive">{{ errors['name'] }}</span>{% endif %}</label>
+  <label class="space-y-1.5 block"><span class="label">Description <span class="font-normal">(shown on the invoice)</span></span>
+    <textarea class="field" name="description" rows="2" maxlength="500">{{ values.get('description', '') }}</textarea></label>
+  <div class="grid gap-5 sm:grid-cols-3">
+    <label class="space-y-1.5"><span class="label">Unit price</span>
+      <input class="field num" name="unit_price" inputmode="decimal" value="{{ values.get('unit_price', '') }}" required {{ 'aria-invalid="true"' if errors.get('price') }}>
+      {% if errors.get('price') %}<span class="text-xs text-destructive">{{ errors['price'] }}</span>{% endif %}</label>
+    <label class="space-y-1.5"><span class="label">Default unit</span>
+      <select class="field" name="unit">
+        {% for u in ['fixed fee', 'hours', 'days', 'units', 'months'] %}<option {{ 'selected' if values.get('unit') == u }}>{{ u }}</option>{% endfor %}
       </select></label>
+    <label class="space-y-1.5"><span class="label">VAT rate (%)</span>
+      <input class="field num" name="vat_rate" inputmode="decimal" value="{{ values.get('vat_rate', '') }}" required></label>
   </div>
-  <label>VAT rate (%) <input name="vat_rate" inputmode="decimal" value="{{ values.get('vat_rate', '') }}" required></label>
-  <div class="row-gap"><button class="btn btn-primary" type="submit">Save service</button>
-    <a class="btn btn-ghost" href="{{ url_for('web.services') }}">Cancel</a></div>
+  <div class="flex items-center justify-end gap-2 border-t border-border pt-5">
+    <a class="{{ btn('secondary') }}" href="{{ url_for('web.services') }}">Cancel</a>
+    <button class="{{ btn('primary') }}" type="submit">Save service</button>
+  </div>
 </form>
 {% endblock %}

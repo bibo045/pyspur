@@ -1,113 +1,148 @@
 {% extends "base.html" %}
-{% from "macros.html" import badge %}
+{% from "ui.html" import page_header, btn, badge, icon, dropdown, confirm_dialog %}
 {% block title %}{{ inv['number'] }}{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.invoice_list') }}">Invoices</a> <span class="mx-1">/</span> <span class="text-foreground">{{ inv['number'] }}</span>{% endblock %}
 {% block content %}
-<header class="page-head">
-  <div>
-    <p class="muted small"><a href="{{ url_for('web.invoice_list') }}">Invoices</a> / {{ inv['number'] }}</p>
-    <h1>{{ inv['number'] }} {{ badge(effective_status) }}</h1>
-    <p class="muted">{{ inv['client_name'] or client_snapshot.get('name', '') }} · issued {{ inv['issue_date']|date }} · due {{ inv['due_date']|date }}</p>
+{% set open_unpaid = effective_status in ('finalized', 'sent', 'overdue') %}
+<header class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+  <div class="min-w-0">
+    <div class="flex flex-wrap items-center gap-3">
+      <h1 class="font-display text-3xl leading-tight tracking-tight sm:text-4xl">{{ inv['number'] }}</h1>
+      {{ badge(effective_status) }}
+    </div>
+    <p class="mt-1 text-sm text-muted-foreground">
+      <span class="text-foreground">{{ inv['client_name'] or client_snapshot.get('name', '') }}</span>
+      · issued {{ inv['issue_date']|date }} · due {{ inv['due_date']|date }}
+    </p>
   </div>
-  <div class="row-gap wrap">
-    <a class="btn" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">Open PDF</a>
-    <a class="btn" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">Print</a>
-    <form method="post" action="{{ url_for('web.invoice_duplicate', invoice_id=inv['id']) }}">
-      <button class="btn" type="submit" data-once>Duplicate</button>
-    </form>
+  <div class="flex flex-wrap items-center gap-2">
+    <a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">{{ icon('download') }} PDF</a>
+    <a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">{{ icon('printer') }} Print</a>
+    {% if open_unpaid or inv['status'] == 'paid' %}
+      <button class="{{ btn('primary') if open_unpaid }} {{ btn('secondary') if not open_unpaid }}" data-dialog-open="pay-dialog">{{ icon('wallet') }} {{ 'Mark as paid' if open_unpaid else 'Payment details' }}</button>
+    {% endif %}
+    {% call dropdown("More actions") %}
+      <form method="post" action="{{ url_for('web.invoice_duplicate', invoice_id=inv['id']) }}">
+        <button role="menuitem" class="menu-item w-full" type="submit">{{ icon('copy') }} Duplicate as new draft</button>
+      </form>
+      {% if open_unpaid %}
+        <button role="menuitem" class="menu-item" data-dialog-open="send-dialog" {{ 'disabled' if not mail_ready }}>{{ icon('send') }} {{ 'Send email' if inv['status'] == 'finalized' else 'Resend email' }}</button>
+        <button role="menuitem" class="menu-item destructive" data-dialog-open="cancel-dialog">{{ icon('x') }} Cancel invoice</button>
+      {% endif %}
+      {% if inv['status'] == 'paid' %}
+        <button role="menuitem" class="menu-item" data-dialog-open="reopen-dialog">{{ icon('refresh') }} Reopen as unpaid</button>
+      {% endif %}
+    {% endcall %}
   </div>
 </header>
 
-<div class="detail-grid">
-  <section class="card">
-    <div class="card-head"><h2>Amounts</h2><span class="strong">{{ inv['total']|money }} {{ inv['currency'] }}</span></div>
-    <table class="table compact">
-      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">VAT</th><th class="num">Total</th></tr></thead>
-      <tbody>
-      {% for it in items %}
-        <tr>
-          <td>{{ it['description'] }}{% if it['unit'] %} <span class="muted small">({{ it['unit'] }})</span>{% endif %}</td>
-          <td class="num">{{ it['quantity'] }}</td>
-          <td class="num">{{ it['unit_price']|money }}</td>
-          <td class="num">{{ it['vat_rate'] }}%</td>
-          <td class="num">{{ it['line_total']|money }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <dl class="summary inline">
-      <dt>Subtotal excl. VAT</dt><dd>{{ inv['subtotal']|money }}</dd>
-      <dt>VAT</dt><dd>{{ inv['vat_total']|money }}</dd>
-      <dt class="strong">Total</dt><dd class="strong">{{ inv['total']|money }}</dd>
+{% if inv['status'] == 'cancelled' %}
+<div class="mb-6 flex items-start gap-3 rounded-[var(--radius-card)] border border-border bg-muted/60 p-4 text-sm">
+  {{ icon('info', 'h-4 w-4 mt-0.5 text-muted-foreground') }}
+  <p><span class="font-medium">This invoice was cancelled.</span> <span class="text-muted-foreground">Reason: {{ inv['cancel_reason'] }}</span></p>
+</div>
+{% endif %}
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="card lg:col-span-2 min-w-0 overflow-hidden" aria-labelledby="amounts-h">
+    <div class="flex items-center justify-between border-b border-border px-5 py-3.5">
+      <h2 id="amounts-h" class="text-sm font-semibold">Line items</h2>
+      <span class="text-xs text-muted-foreground">{{ inv['currency'] }}</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs text-muted-foreground">
+          <tr class="bg-muted/60"><th class="px-5 py-2.5 font-medium">Description</th><th class="px-3 py-2.5 text-right font-medium">Qty</th><th class="px-3 py-2.5 text-right font-medium">Price</th><th class="px-3 py-2.5 text-right font-medium">VAT</th><th class="px-5 py-2.5 text-right font-medium">Total</th></tr>
+        </thead>
+        <tbody class="divide-y divide-border">
+        {% for it in items %}
+          <tr>
+            <td class="px-5 py-3">{{ it['description'] }}{% if it['unit'] %} <span class="text-xs text-muted-foreground">({{ it['unit'] }})</span>{% endif %}</td>
+            <td class="num px-3 py-3">{{ it['quantity'] }}</td>
+            <td class="num px-3 py-3">{{ it['unit_price']|money }}</td>
+            <td class="num px-3 py-3 text-muted-foreground">{{ it['vat_rate'] }}%</td>
+            <td class="num px-5 py-3">{{ it['line_total']|money }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <dl class="ml-auto grid w-full max-w-sm grid-cols-[1fr_auto] gap-x-6 gap-y-1.5 border-t border-border px-5 py-4 text-sm">
+      <dt class="text-muted-foreground">Subtotal excl. VAT</dt><dd class="num">{{ inv['subtotal']|money }}</dd>
+      {% if inv['discount_total'] and inv['discount_total']|float > 0 %}
+      <dt class="text-muted-foreground">Discounts</dt><dd class="num">−{{ inv['discount_total']|money }}</dd>
+      {% endif %}
+      <dt class="text-muted-foreground">VAT</dt><dd class="num">{{ inv['vat_total']|money }}</dd>
+      <div class="col-span-2 my-2 h-px bg-border" aria-hidden="true"></div>
+      <dt class="font-semibold">Total</dt><dd class="num text-base font-semibold">{{ inv['total']|money }} {{ inv['currency'] }}</dd>
     </dl>
-    {% if inv['status'] == 'cancelled' %}<p class="notice">Cancelled: {{ inv['cancel_reason'] }}</p>{% endif %}
   </section>
 
-  <aside class="stack">
-    {% if inv['status'] in ('finalized', 'sent') or effective_status == 'overdue' %}
-    <section class="card">
-      <h2>Email to client</h2>
-      <p class="small">To <strong>{{ client_snapshot.get('email', '') }}</strong></p>
-      {% if mail_ready %}
-      <form method="post" action="{{ url_for('web.invoice_resend', invoice_id=inv['id']) }}" data-once>
-        <label>Subject <input name="subject" value="{{ subject }}" maxlength="300"></label>
-        <label>Message <textarea name="body" rows="6" maxlength="4000">{{ body }}</textarea></label>
-        <button class="btn btn-primary" type="submit">{{ 'Send email' if inv['status'] == 'finalized' else 'Resend email' }}</button>
-      </form>
+  <aside class="flex min-w-0 flex-col gap-6">
+    <section class="card p-5" aria-labelledby="pay-h">
+      <h2 id="pay-h" class="text-sm font-semibold">Payment</h2>
+      {% if inv['status'] == 'paid' %}
+        <p class="mt-3 text-sm"><span class="text-success font-medium">Paid</span> {{ inv['paid_amount']|money }} {{ inv['currency'] }} on {{ inv['paid_date']|date }}</p>
       {% else %}
-      <p class="notice small">Email is not connected. <a href="{{ url_for('web.settings_page') }}">Connect email</a> to send this invoice.</p>
+        <p class="mt-3 text-sm text-muted-foreground">{{ 'Overdue since ' ~ inv['due_date']|date if effective_status == 'overdue' else 'Waiting for payment. Sending an email does not mark an invoice as paid.' }}</p>
+        <button class="{{ btn('secondary', 'sm') }} mt-4 w-full" data-dialog-open="pay-dialog">{{ icon('wallet') }} Record payment</button>
+      {% endif %}
+    </section>
+
+    {% if open_unpaid %}
+    <section class="card p-5" aria-labelledby="email-h">
+      <div class="flex items-center justify-between">
+        <h2 id="email-h" class="text-sm font-semibold">Email to client</h2>
+        <button class="{{ btn('ghost', 'sm') }}" data-dialog-open="send-dialog" {{ 'disabled' if not mail_ready }}>Edit &amp; send</button>
+      </div>
+      <p class="mt-2 break-all text-sm text-muted-foreground">{{ client_snapshot.get('email', '') }}</p>
+      {% if not mail_ready %}
+        <p class="mt-3 text-xs text-warning">Email is not connected. <a class="underline" href="{{ url_for('web.settings_page') }}#email">Connect email</a> to send.</p>
       {% endif %}
     </section>
     {% endif %}
 
-    {% if inv['status'] in ('finalized', 'sent') or effective_status == 'overdue' %}
-    <section class="card">
-      <h2>Payment</h2>
-      <form method="post" action="{{ url_for('web.invoice_payment', invoice_id=inv['id']) }}" class="stack-sm">
-        <input type="hidden" name="action" value="paid">
-        <div class="grid-2">
-          <label>Amount received <input name="amount" inputmode="decimal" value="{{ inv['total'] }}" required></label>
-          <label>Date received <input type="date" name="paid_date" value="{{ today.isoformat() }}" required></label>
-        </div>
-        <button class="btn" type="submit" data-once>Mark as paid</button>
-      </form>
-    </section>
-    {% elif inv['status'] == 'paid' %}
-    <section class="card">
-      <h2>Payment</h2>
-      <p class="small">Paid {{ inv['paid_amount']|money }} on {{ inv['paid_date']|date }}.</p>
-      <form method="post" action="{{ url_for('web.invoice_payment', invoice_id=inv['id']) }}">
-        <input type="hidden" name="action" value="unpaid">
-        <button class="btn btn-ghost" type="submit" onclick="return confirm('Reopen this invoice as unpaid?')">Reopen as unpaid</button>
-      </form>
-    </section>
-    {% endif %}
-
-    {% if inv['status'] in ('finalized', 'sent') %}
-    <section class="card">
-      <h2>Cancel invoice</h2>
-      <p class="small muted">Cancelling keeps the number in the sequence and the PDF on record. For a paid invoice, issue a correction instead.</p>
-      <form method="post" action="{{ url_for('web.invoice_cancel', invoice_id=inv['id']) }}" class="stack-sm" onsubmit="return confirm('Cancel this invoice?')">
-        <label>Reason <input name="reason" required minlength="3" maxlength="300"></label>
-        <button class="btn btn-ghost btn-danger" type="submit">Cancel invoice</button>
-      </form>
-    </section>
-    {% endif %}
-
-    <section class="card">
-      <h2>History</h2>
-      <ul class="timeline">
-        <li><span class="muted small">Finalized</span> {{ inv['finalized_at'] or '—' }}</li>
+    <section class="card p-5" aria-labelledby="hist-h">
+      <h2 id="hist-h" class="text-sm font-semibold">History</h2>
+      <ol class="mt-4 space-y-4 border-l border-border pl-4 text-sm">
+        <li class="relative"><span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary"></span><p class="font-medium">Finalized</p><p class="text-xs text-muted-foreground">{{ inv['finalized_at']|datetime if inv['finalized_at'] else '—' }}</p></li>
         {% for e in emails %}
-          <li class="{{ 'bad' if e['status'] == 'failed' }}">
-            <span class="muted small">{{ e['attempted_at'] }}</span>
-            {% if e['status'] == 'sent' %}Emailed to {{ e['recipient'] }}{% else %}Email failed for {{ e['recipient'] }}: {{ e['error'] }}{% endif %}
+          <li class="relative">
+            <span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full {{ 'bg-success' if e['status'] == 'sent' else 'bg-destructive' }}"></span>
+            {% if e['status'] == 'sent' %}
+              <p class="font-medium">Emailed to {{ e['recipient'] }}</p>
+            {% else %}
+              <p class="font-medium text-destructive">Email failed</p>
+              <p class="text-xs text-muted-foreground">{{ e['error'] }}</p>
+            {% endif %}
+            <p class="text-xs text-muted-foreground">{{ e['attempted_at']|datetime }}</p>
           </li>
         {% else %}
-          <li class="muted">Not emailed yet.</li>
+          <li class="text-muted-foreground">Not emailed yet.</li>
         {% endfor %}
-        {% if inv['paid_date'] %}<li>Paid {{ inv['paid_date']|date }}</li>{% endif %}
-      </ul>
+        {% if inv['paid_date'] %}<li class="relative"><span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-success"></span><p class="font-medium">Paid</p><p class="text-xs text-muted-foreground">{{ inv['paid_date']|date }}</p></li>{% endif %}
+      </ol>
     </section>
   </aside>
 </div>
+
+{# ---- dialogs ---- #}
+{% call confirm_dialog('pay-dialog', 'Record payment', 'Only full payments are supported. Enter the amount received and the date.', url_for('web.invoice_payment', invoice_id=inv['id']), confirm_label='Mark as paid', variant='primary') %}
+  <input type="hidden" name="action" value="paid">
+  <div class="grid grid-cols-2 gap-3">
+    <label class="space-y-1.5"><span class="label">Amount received ({{ inv['currency'] }})</span><input class="field num" name="amount" inputmode="decimal" value="{{ inv['total'] }}" required></label>
+    <label class="space-y-1.5"><span class="label">Date received</span><input class="field" type="date" name="paid_date" value="{{ today.isoformat() }}" required></label>
+  </div>
+{% endcall %}
+
+{% call confirm_dialog('send-dialog', (('Send' if inv['status'] == 'finalized' else 'Resend') ~ ' invoice by email'), 'The PDF is attached. The invoice is only marked as sent when your email provider accepts it.', url_for('web.invoice_resend', invoice_id=inv['id']), confirm_label=('Send email' if inv['status'] == 'finalized' else 'Resend email'), variant='primary') %}
+  <label class="space-y-1.5"><span class="label">Subject</span><input class="field" name="subject" value="{{ subject }}" maxlength="300"></label>
+  <label class="space-y-1.5"><span class="label">Message</span><textarea class="field min-h-32" name="body" rows="6" maxlength="4000">{{ body }}</textarea></label>
+{% endcall %}
+
+{% call confirm_dialog('cancel-dialog', 'Cancel this invoice?', 'The number stays in the sequence and the PDF stays on record. This cannot be undone.', url_for('web.invoice_cancel', invoice_id=inv['id']), confirm_label='Cancel invoice') %}
+  <label class="space-y-1.5"><span class="label">Reason</span><input class="field" name="reason" required minlength="3" maxlength="300" placeholder="e.g. Wrong client"></label>
+{% endcall %}
+
+{{ confirm_dialog('reopen-dialog', 'Reopen as unpaid?', 'The invoice goes back to unpaid. Use this if the payment was recorded by mistake.', url_for('web.invoice_payment', invoice_id=inv['id']), confirm_label='Reopen', variant='secondary') }}
 {% endblock %}

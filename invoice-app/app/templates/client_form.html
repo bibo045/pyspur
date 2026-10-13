@@ -1,19 +1,27 @@
 {% extends "base.html" %}
+{% from "ui.html" import page_header, btn, icon %}
 {% block title %}{{ 'Edit client' if client else 'New client' }}{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.clients') }}">Clients</a> <span class="mx-1">/</span> <span class="text-foreground">{{ 'Edit' if client else 'New' }}</span>{% endblock %}
 {% block content %}
-<header class="page-head"><h1>{{ 'Edit client' if client else 'New client' }}</h1></header>
-<form method="post" class="card form-narrow stack-sm" novalidate>
-  <label>Company or name <input name="name" value="{{ values.get('name', '') }}" required maxlength="150" aria-invalid="{{ 'true' if errors.get('name') }}">
-    {% if errors.get('name') %}<span class="error small">{{ errors['name'] }}</span>{% endif %}</label>
-  <label>Email <input name="email" type="email" value="{{ values.get('email', '') }}" required maxlength="254" aria-invalid="{{ 'true' if errors.get('email') }}">
-    {% if errors.get('email') %}<span class="error small">{{ errors['email'] }}</span>{% endif %}
-    <span class="muted small">Invoices are sent to this address.</span></label>
-  <label>Billing address <textarea name="billing_address" rows="3" maxlength="500">{{ values.get('billing_address', '') }}</textarea></label>
-  <div class="grid-2">
-    <label>Registration no. <input name="registration_no" value="{{ values.get('registration_no', '') }}" maxlength="60"></label>
-    <label>VAT no. <input name="vat_number" value="{{ values.get('vat_number', '') }}" maxlength="60"></label>
+{% call page_header('Edit client' if client else 'New client', 'Invoices to this client are sent to the email address below.') %}{% endcall %}
+<form method="post" class="card mx-auto max-w-2xl space-y-5 p-6" novalidate data-once>
+  <div class="grid gap-5 sm:grid-cols-2">
+    <label class="space-y-1.5 sm:col-span-2"><span class="label">Company or name</span>
+      <input class="field" name="name" value="{{ values.get('name', '') }}" required maxlength="150" {{ 'aria-invalid="true" aria-describedby="e-name"' if errors.get('name') }}>
+      {% if errors.get('name') %}<span id="e-name" class="text-xs text-destructive">{{ errors['name'] }}</span>{% endif %}</label>
+    <label class="space-y-1.5 sm:col-span-2"><span class="label">Email</span>
+      <input class="field" name="email" type="email" value="{{ values.get('email', '') }}" required maxlength="254" {{ 'aria-invalid="true" aria-describedby="e-email"' if errors.get('email') }}>
+      {% if errors.get('email') %}<span id="e-email" class="text-xs text-destructive">{{ errors['email'] }}</span>{% else %}<span class="text-xs text-muted-foreground">Invoices are emailed to this address.</span>{% endif %}</label>
+    <label class="space-y-1.5 sm:col-span-2"><span class="label">Billing address</span>
+      <textarea class="field" name="billing_address" rows="3" maxlength="500">{{ values.get('billing_address', '') }}</textarea></label>
+    <label class="space-y-1.5"><span class="label">Registration no.</span>
+      <input class="field" name="registration_no" value="{{ values.get('registration_no', '') }}" maxlength="60"></label>
+    <label class="space-y-1.5"><span class="label">VAT no.</span>
+      <input class="field" name="vat_number" value="{{ values.get('vat_number', '') }}" maxlength="60"></label>
   </div>
-  <div class="row-gap"><button class="btn btn-primary" type="submit">Save client</button>
-    <a class="btn btn-ghost" href="{{ url_for('web.clients') }}">Cancel</a></div>
+  <div class="flex items-center justify-end gap-2 border-t border-border pt-5">
+    <a class="{{ btn('secondary') }}" href="{{ url_for('web.clients') }}">Cancel</a>
+    <button class="{{ btn('primary') }}" type="submit">Save client</button>
+  </div>
 </form>
 {% endblock %}

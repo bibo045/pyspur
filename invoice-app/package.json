@@ -1,0 +1,15 @@
+{
+  "name": "invoice-app",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./app/static/src/app.css -o ./app/static/css/app.css --minify",
+    "build:vendor": "node -e \"require('fs').copyFileSync('node_modules/motion/dist/motion.js','app/static/vendor/motion.js')\"",
+    "build": "npm run build:css && npm run build:vendor",
+    "watch:css": "tailwindcss -i ./app/static/src/app.css -o ./app/static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0",
+    "motion": "^12.0.0"
+  }
+}

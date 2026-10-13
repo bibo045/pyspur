@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/* Scan templates and scripts for class names. */
+@source "../../templates";
+@source "../../js";
+@source "../../editor.js";
+
+/*
+ * Design tokens. Components use semantic names (background, primary, muted...),
+ * the same vocabulary shadcn/ui uses, so the system stays familiar to anyone who
+ * has built with it. Only this block holds raw colour values.
+ */
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --color-background: oklch(0.985 0.005 85);      /* warm paper */
+  --color-surface: oklch(1 0 0);
+  --color-foreground: oklch(0.22 0.01 75);         /* ink */
+  --color-muted: oklch(0.965 0.007 85);
+  --color-muted-foreground: oklch(0.47 0.01 75);
+  --color-border: oklch(0.91 0.008 80);
+  --color-border-strong: oklch(0.84 0.01 80);
+  --color-primary: oklch(0.36 0.06 165);           /* ink spruce, actions and focus only */
+  --color-primary-foreground: oklch(0.99 0 0);
+  --color-primary-hover: oklch(0.31 0.06 165);
+  --color-ring: oklch(0.5 0.08 165);
+  --color-destructive: oklch(0.52 0.16 28);        /* brick */
+  --color-destructive-foreground: oklch(0.99 0 0);
+  --color-success: oklch(0.5 0.1 155);
+  --color-info: oklch(0.45 0.06 245);              /* slate */
+  --color-warning: oklch(0.6 0.12 70);
+
+  --radius-control: 0.375rem;
+  --radius-card: 0.625rem;
+  --shadow-card: 0 1px 2px oklch(0.2 0.01 75 / 0.05);
+  --shadow-pop: 0 8px 24px -8px oklch(0.2 0.01 75 / 0.18), 0 2px 6px oklch(0.2 0.01 75 / 0.06);
+}
+
+@layer base {
+  html { color-scheme: light; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  :focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; border-radius: 4px; }
+  [hidden] { display: none !important; }
+  h1, h2, h3 { text-wrap: balance; }
+  dialog::backdrop { background: oklch(0.2 0.01 75 / 0.32); }
+}
+
+@layer components {
+  /* Numbers line up in columns. */
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* Form controls, shared by every input, select and textarea. */
+  .field {
+    @apply block w-full rounded-[var(--radius-control)] border border-border-strong bg-surface px-3 py-2 text-sm text-foreground
+      placeholder:text-muted-foreground shadow-none transition-[border-color,box-shadow] duration-150;
+    min-height: 2.25rem;
+  }
+  .field:focus { outline: none; border-color: var(--color-ring); box-shadow: 0 0 0 3px oklch(0.5 0.08 165 / 0.18); }
+  .field[aria-invalid="true"] { border-color: var(--color-destructive); }
+  .field-sm { @apply px-2 py-1 text-sm; min-height: 2rem; height: 2rem; }
+  .label { @apply block text-xs font-medium text-muted-foreground; }
+
+  .card { @apply rounded-[var(--radius-card)] border border-border bg-surface shadow-[var(--shadow-card)]; }
+
+  .menu-item {
+    @apply flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm text-foreground outline-none
+      hover:bg-muted focus:bg-muted cursor-pointer disabled:opacity-50;
+  }
+  .menu-item.destructive { @apply text-destructive; }
+}

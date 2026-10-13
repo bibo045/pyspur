@@ -1,28 +1,45 @@
 {% extends "base.html" %}
-{% block title %}Services & pricing{% endblock %}
+{% from "ui.html" import page_header, btn, icon, empty %}
+{% block title %}Services{% endblock %}
 {% block content %}
-<header class="page-head"><h1>Services &amp; pricing</h1><a class="btn btn-primary" href="{{ url_for('web.service_form') }}">Add service</a></header>
-<label class="inline-check muted small"><input type="checkbox" {{ 'checked' if show_archived }} onchange="location.href='{{ url_for('web.services') }}' + (this.checked ? '?archived=1' : '')"> Show archived</label>
-<section class="card"><div class="table-wrap"><table class="table">
-  <thead><tr><th>Service</th><th>Unit</th><th class="num">Unit price</th><th class="num">VAT</th><th class="actions">Actions</th></tr></thead>
-  <tbody>
-  {% for s in rows %}
-    <tr>
-      <td><strong>{{ s['name'] }}</strong>{% if s['description'] %}<br><span class="muted small">{{ s['description'] }}</span>{% endif %}</td>
-      <td>{{ s['unit'] }}</td>
-      <td class="num">{{ s['unit_price']|money }}</td>
-      <td class="num">{{ s['vat_rate'] }}%</td>
-      <td class="actions">
-        <a href="{{ url_for('web.service_form', service_id=s['id']) }}">Edit</a>
-        <form method="post" action="{{ url_for('web.service_archive', service_id=s['id']) }}" class="inline">
-          <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
-          <button class="link" type="submit">{{ 'Restore' if show_archived else 'Archive' }}</button>
-        </form>
-      </td>
-    </tr>
-  {% else %}
-    <tr><td colspan="5"><div class="empty">{{ 'No archived services.' if show_archived else 'No services yet. Save the services you sell often so future invoices take seconds.' }}</div></td></tr>
-  {% endfor %}
-  </tbody>
-</table></div></section>
+{% call page_header("Services & pricing", "Services you sell often. Pick them in an invoice and the price fills in.") %}
+  <a class="{{ btn('primary') }}" href="{{ url_for('web.service_form') }}">{{ icon('plus') }} Add service</a>
+{% endcall %}
+<div class="mb-4 flex justify-end">
+  <a class="{{ btn('ghost', 'sm') }}" href="{{ url_for('web.services', archived='0' if show_archived else '1') }}">{{ 'Show active services' if show_archived else 'Show archived' }}</a>
+</div>
+<section class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-muted/60 text-left text-xs text-muted-foreground"><tr>
+        <th class="px-5 py-2.5 font-medium">Service</th><th class="px-3 py-2.5 font-medium">Unit</th><th class="px-3 py-2.5 text-right font-medium">Price</th><th class="px-3 py-2.5 text-right font-medium">VAT</th><th class="px-5 py-2.5 text-right font-medium"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody class="divide-y divide-border">
+      {% for s in rows %}
+        <tr class="hover:bg-muted/40">
+          <td class="px-5 py-3"><p class="font-medium">{{ s['name'] }}</p>{% if s['description'] %}<p class="text-xs text-muted-foreground">{{ s['description'] }}</p>{% endif %}</td>
+          <td class="px-3 py-3 text-muted-foreground">{{ s['unit'] }}</td>
+          <td class="num px-3 py-3">{{ s['unit_price']|money }}</td>
+          <td class="num px-3 py-3 text-muted-foreground">{{ s['vat_rate'] }}%</td>
+          <td class="px-5 py-2 text-right whitespace-nowrap">
+            {% if not show_archived %}<a class="{{ btn('ghost', 'sm') }}" href="{{ url_for('web.service_form', service_id=s['id']) }}">Edit</a>{% endif %}
+            <button class="{{ btn('ghost', 'sm') }}" data-dialog-open="sarch-{{ s['id'] }}">{{ 'Restore' if show_archived else 'Archive' }}</button>
+            <dialog id="sarch-{{ s['id'] }}" class="m-auto w-[min(92vw,26rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-left text-foreground shadow-[var(--shadow-pop)]">
+              <form method="post" action="{{ url_for('web.service_archive', service_id=s['id']) }}" class="flex flex-col gap-4 p-5" data-once>
+                <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
+                <div class="space-y-1.5"><h2 class="text-base font-semibold">{{ 'Restore' if show_archived else 'Archive' }} {{ s['name'] }}?</h2>
+                  <p class="text-sm text-muted-foreground">Archived services stay on past invoices but are hidden from the catalog.</p></div>
+                <div class="flex justify-end gap-2"><button type="button" class="{{ btn('secondary') }}" data-dialog-close>Cancel</button>
+                  <button type="submit" class="{{ btn('primary') if show_archived else btn('destructive') }}">{{ 'Restore' if show_archived else 'Archive' }}</button></div>
+              </form>
+            </dialog>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5">{% call empty("No archived services" if show_archived else "No services yet", "" if show_archived else "Save the work you sell most often. Future invoices take seconds.") %}
+          {% if not show_archived %}<a class="{{ btn('primary') }}" href="{{ url_for('web.service_form') }}">Add service</a>{% endif %}{% endcall %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endblock %}

@@ -1,164 +1,216 @@
 {% extends "base.html" %}
-{% block title %}New invoice{% endblock %}
+{% from "ui.html" import btn, icon, confirm_dialog %}
+{% block title %}Draft invoice{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.invoice_list') }}">Invoices</a> <span class="mx-1">/</span> <span class="text-foreground">Draft</span>{% endblock %}
 {% block content %}
-<header class="page-head compact">
+<header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
   <div>
-    <h1>Invoice <span class="muted">· Draft</span></h1>
-    <p class="muted small" id="save-state" role="status" aria-live="polite">All changes saved</p>
+    <h1 class="font-display text-3xl leading-tight tracking-tight sm:text-4xl">New invoice</h1>
+    <p id="save-state" class="mt-1 text-sm text-muted-foreground" role="status" aria-live="polite">Saved</p>
   </div>
-  <div class="row-gap">
-    <button class="btn btn-ghost" type="button" id="save-draft">Save draft</button>
-    <form method="post" action="{{ url_for('web.invoice_delete', invoice_id=inv['id']) }}" onsubmit="return confirm('Delete this draft? This cannot be undone.')">
-      <button class="btn btn-ghost btn-danger" type="submit">Delete draft</button>
-    </form>
+  <div class="flex items-center gap-2">
+    <button id="save-draft" type="button" class="{{ btn('secondary') }}">Save draft</button>
+    <button type="button" class="{{ btn('ghost') }}" data-dialog-open="delete-draft-dialog">{{ icon('trash') }} <span class="sr-only sm:not-sr-only">Delete</span></button>
   </div>
 </header>
 
-<div class="editor" id="editor" data-invoice="{{ inv['id'] }}">
-  <div class="editor-main">
-    <ol class="stepper" role="tablist" aria-label="Invoice steps">
-      {% for key, label in [('client','Client'),('services','Services'),('details','Details'),('template','Template'),('review','Review & send')] %}
-        <li><button type="button" role="tab" class="step {{ 'current' if loop.first }}" data-step="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
-          <span class="step-n">{{ loop.index }}</span>{{ label }}</button></li>
-      {% endfor %}
-    </ol>
+<!-- five steps -->
+<ol class="mb-6 flex gap-1 overflow-x-auto border-b border-border" role="tablist" aria-label="Invoice steps">
+  {% for key, label in [('client','Client'),('services','Services'),('details','Details'),('template','Template'),('review','Review & send')] %}
+  <li class="shrink-0">
+    <button type="button" role="tab" data-step="{{ key }}"
+      aria-selected="{{ 'true' if loop.first else 'false' }}"
+      class="step -mb-px flex items-center gap-2 border-b-2 border-transparent px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground [&.current]:border-primary [&.current]:font-medium [&.current]:text-foreground">
+      <span class="num-step grid h-5 w-5 place-items-center rounded-full border border-border-strong text-[11px] [.current_&]:bg-primary [.current_&]:text-primary-foreground">{{ loop.index }}</span>
+      {{ label }}
+    </button>
+  </li>
+  {% endfor %}
+</ol>
 
-    <div id="form-error" class="flash flash-error" hidden role="alert"></div>
+<div class="grid gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+  <div class="min-w-0 pb-28 lg:pb-0">
+    <div id="form-error" class="mb-4 rounded-[var(--radius-card)] border border-destructive/30 bg-destructive/5 p-3.5 text-sm text-destructive" role="alert" hidden></div>
 
     <!-- 1. Client -->
-    <section class="stage" data-stage="client">
-      <h2>Who is this invoice for?</h2>
-      <div class="client-pick">
-        <input type="search" id="client-search" placeholder="Search clients by name or email" aria-label="Search clients" autocomplete="off">
-        <button type="button" class="btn" id="new-client-btn">+ New client</button>
+    <section class="stage flex flex-col gap-4" data-stage="client" aria-labelledby="s1">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="s1" class="font-display text-2xl">Who is this for?</h2>
+        <button id="new-client-btn" type="button" class="{{ btn('secondary', 'sm') }}">{{ icon('plus') }} New client</button>
       </div>
-      <ul class="pick-list" id="client-list" role="listbox" aria-label="Clients">
+      <div class="relative">
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{{ icon('search', 'h-4 w-4') }}</span>
+        <input id="client-search" class="field pl-9" type="search" placeholder="Search by name or email" aria-label="Search clients" autocomplete="off">
+      </div>
+      <ul id="client-list" class="card max-h-72 divide-y divide-border overflow-y-auto" aria-label="Clients">
         {% for c in clients %}
-        <li><button type="button" class="pick {{ 'selected' if client and client['id'] == c['id'] }}" data-id="{{ c['id'] }}"
-            data-name="{{ c['name'] }}" data-email="{{ c['email'] }}" data-address="{{ c['billing_address'] }}"
+        <li>
+          <button type="button" class="pick flex w-full flex-col items-start gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted [&.selected]:bg-muted [&.selected]:shadow-[inset_3px_0_0_var(--color-primary)]"
+            aria-pressed="{{ 'true' if client and client['id'] == c['id'] else 'false' }}"
+            data-id="{{ c['id'] }}" data-name="{{ c['name'] }}" data-email="{{ c['email'] }}" data-address="{{ c['billing_address'] }}"
             data-reg="{{ c['registration_no'] }}" data-vat="{{ c['vat_number'] }}">
-          <strong>{{ c['name'] }}</strong><span class="muted small">{{ c['email'] }}</span></button></li>
+            <span class="text-sm font-medium">{{ c['name'] }}</span>
+            <span class="text-xs text-muted-foreground">{{ c['email'] }}</span>
+          </button>
+        </li>
         {% else %}
-        <li class="muted">No clients yet. Add your first client to continue.</li>
+        <li class="px-4 py-6 text-center text-sm text-muted-foreground">No clients yet. Add one to continue.</li>
         {% endfor %}
       </ul>
-      <div class="client-card" id="client-card" {{ 'hidden' if not client }}>
-        <div class="muted small">Billing to</div>
-        <div id="client-card-name" class="strong">{{ client['name'] if client }}</div>
-        <div id="client-card-email" class="small">{{ client['email'] if client }}</div>
-        <div id="client-card-address" class="small pre">{{ client['billing_address'] if client }}</div>
+      <div id="client-card" class="card p-4" {{ 'hidden' if not client }}>
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Billing to</p>
+        <p id="client-card-name" class="mt-1 font-medium">{{ client['name'] if client }}</p>
+        <p id="client-card-email" class="text-sm text-muted-foreground">{{ client['email'] if client }}</p>
+        <p id="client-card-address" class="mt-1 whitespace-pre-line text-sm text-muted-foreground">{{ client['billing_address'] if client }}</p>
       </div>
     </section>
 
     <!-- 2. Services -->
-    <section class="stage" data-stage="services" hidden>
-      <h2>What are you billing for?</h2>
-      <div class="catalog">
-        <div class="catalog-head">
-          <span class="muted small">From your catalog</span>
-          <a href="{{ url_for('web.service_form') }}" target="_blank" rel="noopener" class="small">Manage services</a>
+    <section class="stage flex flex-col gap-4" data-stage="services" aria-labelledby="s2" hidden>
+      <h2 id="s2" class="font-display text-2xl">What are you billing for?</h2>
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wide text-muted-foreground">From your catalog</span>
+          <a class="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline" href="{{ url_for('web.services') }}" target="_blank" rel="noopener">Manage services</a>
         </div>
-        <div class="chips" id="catalog">
+        <div id="catalog" class="flex flex-wrap gap-2">
           {% for s in services %}
-          <button type="button" class="chip" data-service='{{ {"id": s["id"], "name": s["name"], "description": s["description"], "unit": s["unit"], "unit_price": s["unit_price"], "vat_rate": s["vat_rate"]}|tojson }}'>
-            + {{ s['name'] }} <span class="muted">{{ s['unit_price']|money }}</span></button>
-          {% else %}<span class="muted small">No services yet. Add a custom line below, or <a href="{{ url_for('web.service_form') }}">create a service</a>.</span>{% endfor %}
+          <button type="button" class="chip inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface px-3 py-1.5 text-sm transition-colors hover:bg-muted"
+            data-service='{{ {"id": s["id"], "name": s["name"], "description": s["description"], "unit": s["unit"], "unit_price": s["unit_price"], "vat_rate": s["vat_rate"]}|tojson }}'>
+            {{ icon('plus', 'h-3.5 w-3.5') }} {{ s['name'] }} <span class="num text-muted-foreground">{{ s['unit_price']|money }}</span>
+          </button>
+          {% else %}
+          <p class="text-sm text-muted-foreground">No services saved yet. Add a custom line, or <a class="underline" href="{{ url_for('web.service_form') }}">create a service</a>.</p>
+          {% endfor %}
+          <button id="add-custom" type="button" class="inline-flex items-center gap-2 rounded-full border border-dashed border-border-strong px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">{{ icon('plus', 'h-3.5 w-3.5') }} Custom line</button>
         </div>
-        <button type="button" class="btn btn-ghost" id="add-custom">+ Custom one-time line</button>
       </div>
-      <div class="lines-wrap">
-        <table class="lines" id="lines">
-          <thead><tr><th class="l-desc">Description</th><th>Qty</th><th>Unit</th><th>Unit price</th><th>Disc %</th><th>VAT %</th><th class="num">Line total</th><th></th></tr></thead>
-          <tbody id="line-body"></tbody>
+      <div class="card overflow-x-auto">
+        <table id="lines" class="w-full min-w-[560px] text-sm">
+          <thead class="bg-muted/60 text-left text-xs text-muted-foreground">
+            <tr><th class="px-3 py-2 font-medium">Description</th><th class="px-2 py-2 font-medium">Qty</th><th class="px-2 py-2 font-medium">Unit</th><th class="px-2 py-2 font-medium">Price</th><th class="px-2 py-2 font-medium">Disc %</th><th class="px-2 py-2 font-medium">VAT %</th><th class="px-3 py-2 text-right font-medium">Total</th><th class="w-8"><span class="sr-only">Remove</span></th></tr>
+          </thead>
+          <tbody id="line-body" class="divide-y divide-border"></tbody>
         </table>
-        <p class="muted small" id="no-lines">No lines yet. Add a service above.</p>
+        <p id="no-lines" class="px-4 py-8 text-center text-sm text-muted-foreground">No lines yet. Add a service above.</p>
       </div>
     </section>
 
     <!-- 3. Details -->
-    <section class="stage" data-stage="details" hidden>
-      <h2>Dates and payment</h2>
-      <div class="grid-2">
-        <label>Issue date <input type="date" id="issue_date" value="{{ inv['issue_date'] }}"></label>
-        <label>Due date <input type="date" id="due_date" value="{{ inv['due_date'] }}"></label>
+    <section class="stage flex flex-col gap-5" data-stage="details" aria-labelledby="s3" hidden>
+      <h2 id="s3" class="font-display text-2xl">Dates and payment</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="space-y-1.5"><span class="label">Issue date</span><input class="field" type="date" id="issue_date" value="{{ inv['issue_date'] }}"></label>
+        <label class="space-y-1.5"><span class="label">Due date</span><input class="field" type="date" id="due_date" value="{{ inv['due_date'] }}"></label>
       </div>
-      <label>Payment terms <input type="text" id="payment_terms" maxlength="200" value="{{ inv['payment_terms'] }}"></label>
-      <label>Payment instructions <textarea id="payment_instructions" rows="2" maxlength="1000">{{ inv['payment_instructions'] }}</textarea></label>
-      <label>Notes on the invoice <textarea id="notes" rows="2" maxlength="1000" placeholder="Optional. e.g. PO number">{{ inv['notes'] }}</textarea></label>
-      <p class="muted small">Bank details come from Business settings: {{ s['bank_iban'] or 'not set yet' }}.</p>
+      <label class="space-y-1.5"><span class="label">Payment terms</span><input class="field" type="text" id="payment_terms" maxlength="200" value="{{ inv['payment_terms'] }}"></label>
+      <label class="space-y-1.5"><span class="label">Payment instructions</span><textarea class="field" id="payment_instructions" rows="2" maxlength="1000">{{ inv['payment_instructions'] }}</textarea></label>
+      <label class="space-y-1.5"><span class="label">Notes on the invoice <span class="font-normal">(optional)</span></span><textarea class="field" id="notes" rows="2" maxlength="1000" placeholder="e.g. Purchase order number">{{ inv['notes'] }}</textarea></label>
+      <p class="text-xs text-muted-foreground">Bank account: {{ s['bank_iban'] or 'not set. Add it in Settings.' }}</p>
     </section>
 
     <!-- 4. Template -->
-    <section class="stage" data-stage="template" hidden>
-      <h2>Choose a look</h2>
-      <div class="tpl-grid">
+    <section class="stage flex flex-col gap-4" data-stage="template" aria-labelledby="s4" hidden>
+      <h2 id="s4" class="font-display text-2xl">Choose a look</h2>
+      <div class="grid gap-3 sm:grid-cols-2">
         {% for key, t in templates.items() %}
-        <label class="tpl-card">
-          <input type="radio" name="template" value="{{ key }}" {{ 'checked' if inv['template'] == key }}>
-          <span class="tpl-name">{{ t['label'] }}</span>
-          <span class="muted small">{{ t['desc'] }}</span>
+        <label class="group relative cursor-pointer rounded-[var(--radius-card)] border border-border-strong bg-surface p-4 transition-colors hover:border-foreground/40 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary">
+          <input type="radio" name="template" value="{{ key }}" class="peer sr-only" {{ 'checked' if inv['template'] == key }}>
+          <span class="flex items-center justify-between gap-2"><span class="text-sm font-medium">{{ t['label'] }}</span>
+            <span class="grid h-4 w-4 place-items-center rounded-full border border-border-strong peer-checked:border-primary peer-checked:bg-primary"></span></span>
+          <span class="mt-1 block text-xs text-muted-foreground">{{ t['desc'] }}</span>
         </label>
         {% endfor %}
       </div>
-      <p class="muted small">Brand colour, font, logo and footer are set in <a href="{{ url_for('web.templates_page') }}" target="_blank" rel="noopener">Templates</a>.</p>
+      <p class="text-xs text-muted-foreground">Brand colour, typeface, logo and footer live in <a class="underline" href="{{ url_for('web.templates_page') }}" target="_blank" rel="noopener">Templates</a>.</p>
     </section>
 
     <!-- 5. Review & send -->
-    <section class="stage" data-stage="review" hidden>
-      <h2>Review and send</h2>
-      <dl class="summary" id="summary">
-        <dt>Client</dt><dd id="sum-client">{{ client['name'] if client else '—' }}</dd>
-        <dt>Subtotal excl. VAT</dt><dd id="sum-subtotal">—</dd>
-        <dt>VAT</dt><dd id="sum-vat">—</dd>
-        <dt class="strong">Total payable</dt><dd class="strong" id="sum-total">—</dd>
+    <section class="stage flex flex-col gap-5" data-stage="review" aria-labelledby="s5" hidden>
+      <h2 id="s5" class="font-display text-2xl">Review and send</h2>
+      <dl class="card grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 p-5 text-sm">
+        <dt class="text-muted-foreground">Client</dt><dd id="sum-client" class="text-right font-medium">{{ client['name'] if client else '—' }}</dd>
+        <dt class="text-muted-foreground">Subtotal excl. VAT</dt><dd id="sum-subtotal" class="num text-right">—</dd>
+        <dt class="text-muted-foreground">VAT</dt><dd id="sum-vat" class="num text-right">—</dd>
+        <dt class="mt-2 border-t border-border pt-3 font-semibold">Total payable</dt><dd id="sum-total" class="num mt-2 border-t border-border pt-3 text-right text-lg font-semibold">—</dd>
       </dl>
-      <label>Email subject <input type="text" id="email_subject" maxlength="300" value="{{ subject }}"></label>
-      <label>Email message <textarea id="email_body" rows="8" maxlength="4000">{{ body }}</textarea></label>
-      <p class="muted small">Placeholders {client_name}, {number}, {total}, {due_date} and {business_name} are filled in when sent.</p>
-      <div class="send-row">
-        <button type="button" class="btn btn-primary btn-lg" id="finalize-send" {{ 'disabled' if not mail_ready }}>Finalize &amp; send</button>
-        <button type="button" class="btn btn-ghost" id="save-draft-2">Save draft</button>
+      <label class="space-y-1.5"><span class="label">Email subject</span><input class="field" id="email_subject" maxlength="300" value="{{ subject }}"></label>
+      <label class="space-y-1.5"><span class="label">Email message</span><textarea class="field min-h-40" id="email_body" rows="8" maxlength="4000">{{ body }}</textarea></label>
+      <p class="text-xs text-muted-foreground">Use {client_name}, {number}, {total}, {due_date} or {business_name}. They are filled in when the email is sent.</p>
+      {% if not mail_ready %}
+      <div class="rounded-[var(--radius-card)] border border-warning/40 bg-warning/5 p-3.5 text-sm">Email is not connected, so finalizing is blocked. <a class="underline" href="{{ url_for('web.settings_page') }}#email">Connect email</a>.</div>
+      {% endif %}
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="finalize-send" type="button" class="{{ btn('primary', 'lg') }}" {{ 'disabled' if not mail_ready }}>{{ icon('send') }} Finalize &amp; send</button>
+        <button id="save-draft-2" type="button" class="{{ btn('secondary', 'lg') }}">Save draft</button>
       </div>
-      {% if not mail_ready %}<p class="notice small">Email is not connected yet, so finalizing is blocked. <a href="{{ url_for('web.settings_page') }}">Connect email</a>.</p>{% endif %}
-      <p class="muted small">Finalizing assigns the next invoice number, saves a PDF copy and emails it. After that the invoice can no longer be edited.</p>
+      <p class="text-xs text-muted-foreground">Finalizing assigns the next invoice number, stores the PDF and emails it. After that the invoice is locked.</p>
     </section>
 
-    <div class="stage-nav">
-      <button type="button" class="btn" id="prev-step">← Back</button>
-      <button type="button" class="btn btn-primary" id="next-step">Continue →</button>
+    <div class="mt-8 flex items-center justify-between gap-3 border-t border-border pt-5">
+      <button id="prev-step" type="button" class="{{ btn('secondary') }}">{{ icon('chevron-left') }} Back</button>
+      <button id="next-step" type="button" class="{{ btn('primary') }}">Continue {{ icon('chevron-right') }}</button>
     </div>
   </div>
 
-  <aside class="editor-side" aria-label="Live preview">
-    <div class="preview-head">
-      <span class="strong">Live preview</span>
-      <span class="muted small" id="preview-state">Up to date</span>
-    </div>
-    <iframe id="preview" title="Invoice PDF preview" src="{{ url_for('web.invoice_preview', invoice_id=inv['id']) }}"></iframe>
-    <div class="total-bar" id="total-bar">
-      <span>Total payable</span><strong id="bar-total">—</strong>
+  <aside class="hidden min-w-0 lg:block" aria-label="Live preview">
+    <div class="sticky top-20 card overflow-hidden">
+      <div class="flex items-center justify-between border-b border-border px-4 py-3">
+        <span class="text-sm font-medium">Live preview</span>
+        <span id="preview-state" class="text-xs text-muted-foreground">Up to date</span>
+      </div>
+      <iframe id="preview" class="block h-[calc(100dvh-13rem)] min-h-[520px] w-full bg-muted" title="Invoice PDF preview" src="{{ url_for('web.invoice_preview', invoice_id=inv['id']) }}"></iframe>
+      <div class="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
+        <span class="text-muted-foreground">Total payable</span><strong id="bar-total" class="num text-base font-semibold">—</strong>
+      </div>
     </div>
   </aside>
 </div>
 
-<!-- quick-add client dialog -->
-<dialog id="client-dialog" aria-labelledby="client-dialog-title">
-  <form method="dialog" id="client-form" class="dialog-form">
-    <h2 id="client-dialog-title">New client</h2>
-    <label>Company or name <input name="name" required maxlength="150"></label>
-    <label>Email <input name="email" type="email" required maxlength="254"></label>
-    <label>Billing address <textarea name="billing_address" rows="3" maxlength="500"></textarea></label>
-    <div class="grid-2">
-      <label>Registration no. <input name="registration_no" maxlength="60"></label>
-      <label>VAT no. <input name="vat_number" maxlength="60"></label>
+<!-- Mobile: persistent total -->
+<div class="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between border-t border-border bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+  <span class="text-sm text-muted-foreground">Total payable</span>
+  <strong id="mobile-total" class="num text-lg font-semibold">—</strong>
+</div>
+
+{# Finalize confirmation #}
+<dialog id="finalize-dialog" class="m-auto w-[min(92vw,26rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-foreground shadow-[var(--shadow-pop)]" aria-labelledby="finalize-title">
+  <div class="flex flex-col gap-4 p-5">
+    <div class="space-y-1.5">
+      <h2 id="finalize-title" class="text-base font-semibold">Finalize and send?</h2>
+      <p class="text-sm text-muted-foreground">The invoice gets its next number, a PDF copy is saved and emailed to <span id="finalize-recipient" class="text-foreground"></span>. After that it cannot be edited.</p>
     </div>
-    <p class="error small" id="client-error" hidden></p>
-    <div class="dialog-actions">
-      <button type="button" class="btn btn-ghost" id="client-cancel">Cancel</button>
-      <button type="submit" class="btn btn-primary" id="client-save">Save and select</button>
+    <div class="flex justify-end gap-2">
+      <button type="button" class="{{ btn('secondary') }}" data-dialog-close>Keep editing</button>
+      <button type="button" id="finalize-confirm" class="{{ btn('primary') }}">Finalize &amp; send</button>
+    </div>
+  </div>
+</dialog>
+
+{# Quick-add client #}
+<dialog id="client-dialog" class="m-auto w-[min(92vw,30rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-foreground shadow-[var(--shadow-pop)]" aria-labelledby="client-dialog-title">
+  <form id="client-form" class="flex flex-col gap-4 p-5" method="dialog" novalidate>
+    <div class="flex items-start justify-between gap-3">
+      <div><h2 id="client-dialog-title" class="text-base font-semibold">New client</h2>
+      <p class="text-sm text-muted-foreground">Saved for future invoices. You stay in this invoice.</p></div>
+      <button type="button" class="{{ btn('ghost', 'icon') }}" data-dialog-close aria-label="Close">{{ icon('x') }}</button>
+    </div>
+    <label class="space-y-1.5"><span class="label">Company or name</span><input class="field" name="name" required maxlength="150"></label>
+    <label class="space-y-1.5"><span class="label">Email</span><input class="field" name="email" type="email" required maxlength="254"></label>
+    <label class="space-y-1.5"><span class="label">Billing address</span><textarea class="field" name="billing_address" rows="3" maxlength="500"></textarea></label>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <label class="space-y-1.5"><span class="label">Registration no.</span><input class="field" name="registration_no" maxlength="60"></label>
+      <label class="space-y-1.5"><span class="label">VAT no.</span><input class="field" name="vat_number" maxlength="60"></label>
+    </div>
+    <p id="client-error" class="text-sm text-destructive" role="alert" hidden></p>
+    <div class="flex justify-end gap-2">
+      <button id="client-cancel" type="button" class="{{ btn('secondary') }}" data-dialog-close>Cancel</button>
+      <button id="client-save" type="submit" class="{{ btn('primary') }}">Save and select</button>
     </div>
   </form>
 </dialog>
+
+{{ confirm_dialog('delete-draft-dialog', 'Delete this draft?', 'The draft is removed. Issued invoices cannot be deleted.', url_for('web.invoice_delete', invoice_id=inv['id']), confirm_label='Delete draft') }}
 
 <script id="editor-data" type="application/json">{{ editor|tojson }}</script>
 {% endblock %}

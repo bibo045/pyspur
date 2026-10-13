@@ -1,65 +1,101 @@
 {% extends "base.html" %}
-{% from "macros.html" import badge %}
+{% from "ui.html" import page_header, btn, badge, icon, dropdown, empty, confirm_dialog %}
 {% block title %}Invoices{% endblock %}
 {% block content %}
-<header class="page-head">
-  <h1>Invoices</h1>
+{% call page_header("Invoices", total_rows ~ " invoice" ~ ('' if total_rows == 1 else 's')) %}
   <form method="post" action="{{ url_for('web.invoice_new') }}">
-    <button class="btn btn-primary" type="submit" data-once>Create invoice</button>
+    <button class="{{ btn('primary') }}" type="submit" data-once>{{ icon('plus') }} New invoice</button>
   </form>
-</header>
-<form class="toolbar" method="get">
-  <input type="search" name="q" value="{{ q }}" placeholder="Search number or client" aria-label="Search invoices">
-  <select name="status" aria-label="Filter by status">
-    <option value="">All statuses</option>
-    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s|capitalize }}</option>{% endfor %}
-  </select>
+{% endcall %}
+
+<form method="get" class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center" role="search">
+  <div class="relative flex-1 lg:max-w-xs">
+    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{{ icon('search', 'h-4 w-4') }}</span>
+    <input class="field pl-9" type="search" name="q" value="{{ q }}" placeholder="Search number or client" aria-label="Search invoices">
+  </div>
+  <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by status">
+    {% for value, label in [('', 'All'), ('draft','Draft'), ('finalized','Finalized'), ('sent','Sent'), ('overdue','Overdue'), ('paid','Paid'), ('cancelled','Cancelled')] %}
+      <button type="submit" name="status" value="{{ value }}"
+        class="{{ 'bg-foreground text-background' if status == value else 'bg-surface text-muted-foreground border border-border hover:text-foreground' }} rounded-full px-3 py-1 text-xs font-medium transition-colors"
+        {{ 'aria-pressed="true"' if status == value else 'aria-pressed="false"' }}>{{ label }}</button>
+    {% endfor %}
+  </div>
   <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dir }}">
-  <button class="btn" type="submit">Apply</button>
 </form>
-<section class="card">
-<div class="table-wrap">
-<table class="table">
-  <thead>
-    <tr>
-      {% for key, label in [('number','Number'),('client','Client'),('issue','Issued'),('due','Due'),('total','Total')] %}
-      <th class="{{ 'num' if key == 'total' }}">
-        <a href="{{ url_for('web.invoice_list', q=q, status=status, sort=key, dir='asc' if sort == key and dir == 'desc' else 'desc') }}">{{ label }}{% if sort == key %} {{ '↑' if dir == 'asc' else '↓' }}{% endif %}</a>
-      </th>
+
+<section class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-muted/60 text-left text-xs text-muted-foreground">
+        <tr>
+          {% for key, label, cls in [('number','Number','px-5'),('client','Client','px-3'),('issue','Issued','px-3'),('due','Due','px-3'),('total','Total','px-3 text-right')] %}
+          <th scope="col" class="{{ cls }} py-2.5 font-medium" {{ 'aria-sort="' ~ ('ascending' if dir == 'asc' else 'descending') ~ '"' if sort == key }}>
+            <a class="inline-flex items-center gap-1 hover:text-foreground"
+               href="{{ url_for('web.invoice_list', q=q, status=status, sort=key, dir='asc' if sort == key and dir == 'desc' else 'desc') }}">
+              {{ label }}{% if sort == key %}<span aria-hidden="true">{{ '↑' if dir == 'asc' else '↓' }}</span>{% endif %}
+            </a>
+          </th>
+          {% endfor %}
+          <th scope="col" class="px-3 py-2.5 font-medium">Status</th>
+          <th scope="col" class="px-5 py-2.5"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-border">
+      {% for r in rows %}
+        <tr class="hover:bg-muted/40">
+          <td class="px-5 py-3 font-medium"><a class="hover:underline" href="{{ url_for('web.invoice_detail', invoice_id=r['id']) if r['status'] != 'draft' else url_for('web.invoice_edit', invoice_id=r['id']) }}">{{ r['number'] or 'Draft' }}</a></td>
+          <td class="px-3 py-3 text-muted-foreground">{{ r['client_name'] or '—' }}</td>
+          <td class="px-3 py-3 whitespace-nowrap">{{ r['issue_date']|date }}</td>
+          <td class="px-3 py-3 whitespace-nowrap">{{ r['due_date']|date }}</td>
+          <td class="num px-3 py-3">{{ r['total']|money }}</td>
+          <td class="px-3 py-3">{{ badge(effective(r)) }}</td>
+          <td class="px-5 py-2 text-right">
+            {% call dropdown("Actions for " ~ (r['number'] or 'draft')) %}
+              {% if r['status'] == 'draft' %}
+                <a role="menuitem" class="menu-item" href="{{ url_for('web.invoice_edit', invoice_id=r['id']) }}">{{ icon('edit') }} Continue editing</a>
+                <button role="menuitem" class="menu-item destructive" data-dialog-open="del-{{ r['id'] }}">{{ icon('trash') }} Delete draft</button>
+              {% else %}
+                <a role="menuitem" class="menu-item" href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ icon('eye') }} Open</a>
+                <a role="menuitem" class="menu-item" href="{{ url_for('web.invoice_download', invoice_id=r['id']) }}" target="_blank" rel="noopener">{{ icon('download') }} Download PDF</a>
+                <a role="menuitem" class="menu-item" href="{{ url_for('web.invoice_download', invoice_id=r['id']) }}" target="_blank" rel="noopener">{{ icon('printer') }} Print</a>
+                <form method="post" action="{{ url_for('web.invoice_duplicate', invoice_id=r['id']) }}">
+                  <button role="menuitem" class="menu-item w-full" type="submit">{{ icon('copy') }} Duplicate</button>
+                </form>
+                {% if r['status'] in ('finalized','sent') %}
+                <form method="post" action="{{ url_for('web.invoice_resend', invoice_id=r['id']) }}">
+                  <button role="menuitem" class="menu-item w-full" type="submit" {{ 'disabled' if not mail_ready }}>{{ icon('send') }} {{ 'Send email' if r['status'] == 'finalized' else 'Resend email' }}</button>
+                </form>
+                {% endif %}
+              {% endif %}
+            {% endcall %}
+            {% if r['status'] == 'draft' %}
+              {{ confirm_dialog('del-' ~ r['id'], 'Delete this draft?', 'The draft is removed. Issued invoices cannot be deleted.', url_for('web.invoice_delete', invoice_id=r['id']), confirm_label='Delete draft') }}
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8">
+          {% if q or status %}
+            {% call empty("No invoices match these filters", "Try a different search or clear the status filter.") %}
+              <a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_list') }}">Clear filters</a>
+            {% endcall %}
+          {% else %}
+            {% call empty("No invoices yet", "Create one to see it here.") %}
+              <form method="post" action="{{ url_for('web.invoice_new') }}"><button class="{{ btn('primary') }}" type="submit" data-once>Create invoice</button></form>
+            {% endcall %}
+          {% endif %}
+        </td></tr>
       {% endfor %}
-      <th>Status</th><th class="actions">Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td><a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] or 'Draft' }}</a></td>
-      <td>{{ r['client_name'] or '—' }}</td>
-      <td>{{ r['issue_date']|date }}</td>
-      <td>{{ r['due_date']|date }}</td>
-      <td class="num">{{ r['total']|money }}</td>
-      <td>{{ badge(effective(r)) }}</td>
-      <td class="actions">
-        {% if r['status'] == 'draft' %}
-          <a href="{{ url_for('web.invoice_edit', invoice_id=r['id']) }}">Continue</a>
-        {% else %}
-          <a href="{{ url_for('web.invoice_download', invoice_id=r['id']) }}" target="_blank" rel="noopener">PDF</a>
-          <a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">Open</a>
-        {% endif %}
-      </td>
-    </tr>
-  {% else %}
-    <tr><td colspan="8"><div class="empty">No invoices match these filters.</div></td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-</div>
+      </tbody>
+    </table>
+  </div>
 </section>
+
 {% if pages > 1 %}
-<nav class="pager" aria-label="Pagination">
-  {% if page > 1 %}<a href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page-1) }}">← Previous</a>{% endif %}
-  <span class="muted">Page {{ page }} of {{ pages }} · {{ total_rows }} invoices</span>
-  {% if page < pages %}<a href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page+1) }}">Next →</a>{% endif %}
+<nav class="mt-4 flex items-center justify-between text-sm" aria-label="Pagination">
+  {% if page > 1 %}<a class="{{ btn('secondary', 'sm') }}" href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page-1) }}">{{ icon('chevron-left') }} Previous</a>{% else %}<span></span>{% endif %}
+  <span class="text-muted-foreground">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="{{ btn('secondary', 'sm') }}" href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page+1) }}">Next {{ icon('chevron-right') }}</a>{% else %}<span></span>{% endif %}
 </nav>
 {% endif %}
 {% endblock %}
