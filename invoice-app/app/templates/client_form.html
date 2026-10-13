@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit client' if client else 'New client' }}{% endblock %}
+{% block content %}
+<header class="page-head"><h1>{{ 'Edit client' if client else 'New client' }}</h1></header>
+<form method="post" class="card form-narrow stack-sm" novalidate>
+  <label>Company or name <input name="name" value="{{ values.get('name', '') }}" required maxlength="150" aria-invalid="{{ 'true' if errors.get('name') }}">
+    {% if errors.get('name') %}<span class="error small">{{ errors['name'] }}</span>{% endif %}</label>
+  <label>Email <input name="email" type="email" value="{{ values.get('email', '') }}" required maxlength="254" aria-invalid="{{ 'true' if errors.get('email') }}">
+    {% if errors.get('email') %}<span class="error small">{{ errors['email'] }}</span>{% endif %}
+    <span class="muted small">Invoices are sent to this address.</span></label>
+  <label>Billing address <textarea name="billing_address" rows="3" maxlength="500">{{ values.get('billing_address', '') }}</textarea></label>
+  <div class="grid-2">
+    <label>Registration no. <input name="registration_no" value="{{ values.get('registration_no', '') }}" maxlength="60"></label>
+    <label>VAT no. <input name="vat_number" value="{{ values.get('vat_number', '') }}" maxlength="60"></label>
+  </div>
+  <div class="row-gap"><button class="btn btn-primary" type="submit">Save client</button>
+    <a class="btn btn-ghost" href="{{ url_for('web.clients') }}">Cancel</a></div>
+</form>
+{% endblock %}

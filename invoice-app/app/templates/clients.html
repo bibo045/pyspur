@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Clients{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Clients</h1><a class="btn btn-primary" href="{{ url_for('web.client_form') }}">Add client</a></header>
+<form class="toolbar" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search name or email" aria-label="Search clients">
+  <label class="inline-check"><input type="checkbox" name="archived" value="1" {{ 'checked' if show_archived }} onchange="this.form.submit()"> Show archived</label>
+  <button class="btn" type="submit">Search</button>
+</form>
+<section class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Name</th><th>Email</th><th>VAT no.</th><th class="actions">Actions</th></tr></thead>
+  <tbody>
+  {% for c in rows %}
+    <tr>
+      <td><a href="{{ url_for('web.client_detail', client_id=c['id']) }}">{{ c['name'] }}</a></td>
+      <td>{{ c['email'] }}</td>
+      <td>{{ c['vat_number'] or '—' }}</td>
+      <td class="actions">
+        <a href="{{ url_for('web.client_form', client_id=c['id']) }}">Edit</a>
+        <form method="post" action="{{ url_for('web.client_archive', client_id=c['id']) }}" class="inline">
+          <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
+          <button class="link" type="submit">{{ 'Restore' if show_archived else 'Archive' }}</button>
+        </form>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4"><div class="empty">{{ 'No archived clients.' if show_archived else 'No clients yet. Add one to start invoicing.' }}</div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></section>
+{% endblock %}

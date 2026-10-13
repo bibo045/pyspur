@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Invoices{% endblock %} · Invoicing</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="{{ url_for('web.dashboard') }}">
+      <span class="brand-mark">▲</span><span>{{ business_name or 'Invoicing' }}</span>
+    </a>
+    <nav>
+      {% set nav = [('web.dashboard','Dashboard','dashboard'), ('web.invoice_list','Invoices','invoices'),
+                    ('web.clients','Clients','clients'), ('web.services','Services & pricing','services'),
+                    ('web.templates_page','Templates','templates'), ('web.settings_page','Business settings','settings')] %}
+      {% for endpoint, label, key in nav %}
+        <a href="{{ url_for(endpoint) }}" class="{{ 'active' if request.endpoint and (request.endpoint == endpoint or (key == 'invoices' and request.endpoint in ('web.invoice_detail','web.invoice_edit'))) }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      {% if mail_ready %}<span class="dot ok"></span> Email connected{% else %}<span class="dot warn"></span> <a href="{{ url_for('web.settings_page') }}">Connect email</a>{% endif %}
+    </div>
+  </aside>
+  <main class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash flash-{{ cat }}" role="status">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<div class="mobile-bar" hidden id="mobile-bar"></div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

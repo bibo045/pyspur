@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}New invoice{% endblock %}
+{% block content %}
+<header class="page-head compact">
+  <div>
+    <h1>Invoice <span class="muted">· Draft</span></h1>
+    <p class="muted small" id="save-state" role="status" aria-live="polite">All changes saved</p>
+  </div>
+  <div class="row-gap">
+    <button class="btn btn-ghost" type="button" id="save-draft">Save draft</button>
+    <form method="post" action="{{ url_for('web.invoice_delete', invoice_id=inv['id']) }}" onsubmit="return confirm('Delete this draft? This cannot be undone.')">
+      <button class="btn btn-ghost btn-danger" type="submit">Delete draft</button>
+    </form>
+  </div>
+</header>
+
+<div class="editor" id="editor" data-invoice="{{ inv['id'] }}">
+  <div class="editor-main">
+    <ol class="stepper" role="tablist" aria-label="Invoice steps">
+      {% for key, label in [('client','Client'),('services','Services'),('details','Details'),('template','Template'),('review','Review & send')] %}
+        <li><button type="button" role="tab" class="step {{ 'current' if loop.first }}" data-step="{{ key }}" aria-selected="{{ 'true' if loop.first else 'false' }}">
+          <span class="step-n">{{ loop.index }}</span>{{ label }}</button></li>
+      {% endfor %}
+    </ol>
+
+    <div id="form-error" class="flash flash-error" hidden role="alert"></div>
+
+    <!-- 1. Client -->
+    <section class="stage" data-stage="client">
+      <h2>Who is this invoice for?</h2>
+      <div class="client-pick">
+        <input type="search" id="client-search" placeholder="Search clients by name or email" aria-label="Search clients" autocomplete="off">
+        <button type="button" class="btn" id="new-client-btn">+ New client</button>
+      </div>
+      <ul class="pick-list" id="client-list" role="listbox" aria-label="Clients">
+        {% for c in clients %}
+        <li><button type="button" class="pick {{ 'selected' if client and client['id'] == c['id'] }}" data-id="{{ c['id'] }}"
+            data-name="{{ c['name'] }}" data-email="{{ c['email'] }}" data-address="{{ c['billing_address'] }}"
+            data-reg="{{ c['registration_no'] }}" data-vat="{{ c['vat_number'] }}">
+          <strong>{{ c['name'] }}</strong><span class="muted small">{{ c['email'] }}</span></button></li>
+        {% else %}
+        <li class="muted">No clients yet. Add your first client to continue.</li>
+        {% endfor %}
+      </ul>
+      <div class="client-card" id="client-card" {{ 'hidden' if not client }}>
+        <div class="muted small">Billing to</div>
+        <div id="client-card-name" class="strong">{{ client['name'] if client }}</div>
+        <div id="client-card-email" class="small">{{ client['email'] if client }}</div>
+        <div id="client-card-address" class="small pre">{{ client['billing_address'] if client }}</div>
+      </div>
+    </section>
+
+    <!-- 2. Services -->
+    <section class="stage" data-stage="services" hidden>
+      <h2>What are you billing for?</h2>
+      <div class="catalog">
+        <div class="catalog-head">
+          <span class="muted small">From your catalog</span>
+          <a href="{{ url_for('web.service_form') }}" target="_blank" rel="noopener" class="small">Manage services</a>
+        </div>
+        <div class="chips" id="catalog">
+          {% for s in services %}
+          <button type="button" class="chip" data-service='{{ {"id": s["id"], "name": s["name"], "description": s["description"], "unit": s["unit"], "unit_price": s["unit_price"], "vat_rate": s["vat_rate"]}|tojson }}'>
+            + {{ s['name'] }} <span class="muted">{{ s['unit_price']|money }}</span></button>
+          {% else %}<span class="muted small">No services yet. Add a custom line below, or <a href="{{ url_for('web.service_form') }}">create a service</a>.</span>{% endfor %}
+        </div>
+        <button type="button" class="btn btn-ghost" id="add-custom">+ Custom one-time line</button>
+      </div>
+      <div class="lines-wrap">
+        <table class="lines" id="lines">
+          <thead><tr><th class="l-desc">Description</th><th>Qty</th><th>Unit</th><th>Unit price</th><th>Disc %</th><th>VAT %</th><th class="num">Line total</th><th></th></tr></thead>
+          <tbody id="line-body"></tbody>
+        </table>
+        <p class="muted small" id="no-lines">No lines yet. Add a service above.</p>
+      </div>
+    </section>
+
+    <!-- 3. Details -->
+    <section class="stage" data-stage="details" hidden>
+      <h2>Dates and payment</h2>
+      <div class="grid-2">
+        <label>Issue date <input type="date" id="issue_date" value="{{ inv['issue_date'] }}"></label>
+        <label>Due date <input type="date" id="due_date" value="{{ inv['due_date'] }}"></label>
+      </div>
+      <label>Payment terms <input type="text" id="payment_terms" maxlength="200" value="{{ inv['payment_terms'] }}"></label>
+      <label>Payment instructions <textarea id="payment_instructions" rows="2" maxlength="1000">{{ inv['payment_instructions'] }}</textarea></label>
+      <label>Notes on the invoice <textarea id="notes" rows="2" maxlength="1000" placeholder="Optional. e.g. PO number">{{ inv['notes'] }}</textarea></label>
+      <p class="muted small">Bank details come from Business settings: {{ s['bank_iban'] or 'not set yet' }}.</p>
+    </section>
+
+    <!-- 4. Template -->
+    <section class="stage" data-stage="template" hidden>
+      <h2>Choose a look</h2>
+      <div class="tpl-grid">
+        {% for key, t in templates.items() %}
+        <label class="tpl-card">
+          <input type="radio" name="template" value="{{ key }}" {{ 'checked' if inv['template'] == key }}>
+          <span class="tpl-name">{{ t['label'] }}</span>
+          <span class="muted small">{{ t['desc'] }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="muted small">Brand colour, font, logo and footer are set in <a href="{{ url_for('web.templates_page') }}" target="_blank" rel="noopener">Templates</a>.</p>
+    </section>
+
+    <!-- 5. Review & send -->
+    <section class="stage" data-stage="review" hidden>
+      <h2>Review and send</h2>
+      <dl class="summary" id="summary">
+        <dt>Client</dt><dd id="sum-client">{{ client['name'] if client else '—' }}</dd>
+        <dt>Subtotal excl. VAT</dt><dd id="sum-subtotal">—</dd>
+        <dt>VAT</dt><dd id="sum-vat">—</dd>
+        <dt class="strong">Total payable</dt><dd class="strong" id="sum-total">—</dd>
+      </dl>
+      <label>Email subject <input type="text" id="email_subject" maxlength="300" value="{{ subject }}"></label>
+      <label>Email message <textarea id="email_body" rows="8" maxlength="4000">{{ body }}</textarea></label>
+      <p class="muted small">Placeholders {client_name}, {number}, {total}, {due_date} and {business_name} are filled in when sent.</p>
+      <div class="send-row">
+        <button type="button" class="btn btn-primary btn-lg" id="finalize-send" {{ 'disabled' if not mail_ready }}>Finalize &amp; send</button>
+        <button type="button" class="btn btn-ghost" id="save-draft-2">Save draft</button>
+      </div>
+      {% if not mail_ready %}<p class="notice small">Email is not connected yet, so finalizing is blocked. <a href="{{ url_for('web.settings_page') }}">Connect email</a>.</p>{% endif %}
+      <p class="muted small">Finalizing assigns the next invoice number, saves a PDF copy and emails it. After that the invoice can no longer be edited.</p>
+    </section>
+
+    <div class="stage-nav">
+      <button type="button" class="btn" id="prev-step">← Back</button>
+      <button type="button" class="btn btn-primary" id="next-step">Continue →</button>
+    </div>
+  </div>
+
+  <aside class="editor-side" aria-label="Live preview">
+    <div class="preview-head">
+      <span class="strong">Live preview</span>
+      <span class="muted small" id="preview-state">Up to date</span>
+    </div>
+    <iframe id="preview" title="Invoice PDF preview" src="{{ url_for('web.invoice_preview', invoice_id=inv['id']) }}"></iframe>
+    <div class="total-bar" id="total-bar">
+      <span>Total payable</span><strong id="bar-total">—</strong>
+    </div>
+  </aside>
+</div>
+
+<!-- quick-add client dialog -->
+<dialog id="client-dialog" aria-labelledby="client-dialog-title">
+  <form method="dialog" id="client-form" class="dialog-form">
+    <h2 id="client-dialog-title">New client</h2>
+    <label>Company or name <input name="name" required maxlength="150"></label>
+    <label>Email <input name="email" type="email" required maxlength="254"></label>
+    <label>Billing address <textarea name="billing_address" rows="3" maxlength="500"></textarea></label>
+    <div class="grid-2">
+      <label>Registration no. <input name="registration_no" maxlength="60"></label>
+      <label>VAT no. <input name="vat_number" maxlength="60"></label>
+    </div>
+    <p class="error small" id="client-error" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-ghost" id="client-cancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="client-save">Save and select</button>
+    </div>
+  </form>
+</dialog>
+
+<script id="editor-data" type="application/json">{{ editor|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='editor.js') }}" defer></script>{% endblock %}

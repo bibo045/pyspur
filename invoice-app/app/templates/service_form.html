@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit service' if svc else 'New service' }}{% endblock %}
+{% block content %}
+<header class="page-head"><h1>{{ 'Edit service' if svc else 'New service' }}</h1></header>
+<form method="post" class="card form-narrow stack-sm" novalidate>
+  <label>Service name <input name="name" value="{{ values.get('name', '') }}" required maxlength="150">
+    {% if errors.get('name') %}<span class="error small">{{ errors['name'] }}</span>{% endif %}</label>
+  <label>Description <textarea name="description" rows="2" maxlength="500">{{ values.get('description', '') }}</textarea></label>
+  <div class="grid-2">
+    <label>Unit price <input name="unit_price" inputmode="decimal" value="{{ values.get('unit_price', '') }}" required>
+      {% if errors.get('price') %}<span class="error small">{{ errors['price'] }}</span>{% endif %}</label>
+    <label>Default unit
+      <select name="unit">
+        {% for u in ['fixed fee', 'hours', 'days', 'units', 'months'] %}
+          <option {{ 'selected' if values.get('unit') == u }}>{{ u }}</option>
+        {% endfor %}
+      </select></label>
+  </div>
+  <label>VAT rate (%) <input name="vat_rate" inputmode="decimal" value="{{ values.get('vat_rate', '') }}" required></label>
+  <div class="row-gap"><button class="btn btn-primary" type="submit">Save service</button>
+    <a class="btn btn-ghost" href="{{ url_for('web.services') }}">Cancel</a></div>
+</form>
+{% endblock %}

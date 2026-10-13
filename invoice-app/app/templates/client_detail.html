@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge %}
+{% block title %}{{ client['name'] }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div><p class="muted small"><a href="{{ url_for('web.clients') }}">Clients</a></p><h1>{{ client['name'] }}</h1>
+    <p class="muted">{{ client['email'] }}</p></div>
+  <div class="row-gap">
+    <a class="btn" href="{{ url_for('web.client_form', client_id=client['id']) }}">Edit</a>
+    <form method="post" action="{{ url_for('web.invoice_new') }}">
+      <button class="btn btn-primary" type="submit" data-once>New invoice</button>
+    </form>
+  </div>
+</header>
+<div class="detail-grid">
+  <section class="card"><h2>Billing details</h2>
+    <p class="pre small">{{ client['billing_address'] or 'No billing address.' }}</p>
+    {% if client['registration_no'] %}<p class="small">Reg. no: {{ client['registration_no'] }}</p>{% endif %}
+    {% if client['vat_number'] %}<p class="small">VAT no: {{ client['vat_number'] }}</p>{% endif %}
+    <p class="small muted">Outstanding: {{ outstanding|money }}</p>
+  </section>
+  <section class="card"><h2>Invoices</h2>
+    <div class="table-wrap"><table class="table compact">
+      <thead><tr><th>Number</th><th>Issued</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for r in invoices %}
+        <tr><td><a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }}</a></td>
+            <td>{{ r['issue_date']|date }}</td><td class="num">{{ r['total']|money }}</td>
+            <td>{{ badge(effective(r)) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="muted">No invoices yet.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

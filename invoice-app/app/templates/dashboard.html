@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="muted">{{ today.strftime('%A, %d %B %Y') }}</p>
+  </div>
+  <form method="post" action="{{ url_for('web.invoice_new') }}">
+    <button class="btn btn-primary btn-lg" type="submit" data-once>Create invoice</button>
+  </form>
+</header>
+
+{% if not setup_ok %}
+<div class="notice">
+  <strong>Finish setup to send invoices.</strong>
+  {% if not mail_ready %}Connect an email provider. {% endif %}
+  Add your business details and bank account in <a href="{{ url_for('web.settings_page') }}">Business settings</a>.
+</div>
+{% endif %}
+
+<section class="kpis">
+  <div class="kpi"><span class="kpi-label">Invoiced this month</span><span class="kpi-value">{{ month_total|money }}</span></div>
+  <div class="kpi"><span class="kpi-label">Outstanding</span><span class="kpi-value">{{ outstanding|money }}</span></div>
+  <div class="kpi"><span class="kpi-label">Paid <span class="muted">({{ paid_count }})</span></span><span class="kpi-value">{{ paid|money }}</span></div>
+  <div class="kpi {{ 'kpi-alert' if overdue_count }}"><span class="kpi-label">Overdue <span class="muted">({{ overdue_count }})</span></span><span class="kpi-value">{{ overdue|money }}</span></div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Recent invoices</h2>
+    <div class="row-gap">
+      {% if has_demo %}
+      <form method="post" action="{{ url_for('web.settings_demo') }}">
+        <input type="hidden" name="action" value="clear"><button class="btn btn-ghost" type="submit">Remove demo data</button>
+      </form>
+      {% endif %}
+      <a href="{{ url_for('web.invoice_list') }}">View all</a>
+    </div>
+  </div>
+  {% if recent %}
+  <div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Number</th><th>Client</th><th>Issued</th><th>Due</th><th class="num">Total</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for r in recent %}
+      <tr>
+        <td><a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }}</a></td>
+        <td>{{ r['client_name'] }}</td>
+        <td>{{ r['issue_date']|date }}</td>
+        <td>{{ r['due_date']|date }}</td>
+        <td class="num">{{ r['total']|money }}</td>
+        <td>{{ badge(effective(r)) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty">
+    <p>No invoices yet.</p>
+    <p class="muted">Create your first invoice. It takes about 30 seconds for a returning client.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

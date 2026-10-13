@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Business settings{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Business settings</h1></header>
+
+<section class="card setup">
+  <h2>Setup checklist</h2>
+  <ul class="checklist">
+    <li class="{{ 'done' if s['business_name'] }}">Business name and address</li>
+    <li class="{{ 'done' if s['bank_iban'] }}">Bank account for payment instructions</li>
+    <li class="{{ 'done' if mail_ready }}">Email provider connected (server environment variables)</li>
+  </ul>
+  <details class="env-help" {{ '' if mail_ready else 'open' }}>
+    <summary>Connect email delivery</summary>
+    <p class="small">Set these on the server (never in the browser). Any SMTP provider works: Amazon SES, Postmark, SendGrid, Mailgun, Resend, or Gmail with an app password.</p>
+    <pre class="code">SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURITY=starttls    # starttls | ssl | none
+SMTP_USERNAME=...
+SMTP_PASSWORD=...
+SMTP_FROM="Your Business &lt;billing@yourdomain.com&gt;"</pre>
+    <p class="small">Status: {% for k, v in mail.items() %}<span class="pill {{ 'ok' if v else 'off' }}">{{ k }}</span> {% endfor %}</p>
+    {% if mail_ready and s['business_email'] %}
+    <form method="post" action="{{ url_for('web.settings_test_email') }}"><button class="btn" type="submit">Send a test email to {{ s['business_email'] }}</button></form>
+    {% endif %}
+  </details>
+</section>
+
+<form method="post" enctype="multipart/form-data" class="settings-grid">
+  <section class="card stack-sm">
+    <h2>Your business</h2>
+    <label>Business name <input name="business_name" value="{{ s['business_name'] }}" maxlength="150"></label>
+    <label>Contact email <input name="business_email" type="email" value="{{ s['business_email'] }}" maxlength="254"></label>
+    <label>Phone <input name="business_phone" value="{{ s['business_phone'] }}" maxlength="60"></label>
+    <label>Address <textarea name="business_address" rows="3" maxlength="500">{{ s['business_address'] }}</textarea></label>
+    <div class="grid-2">
+      <label>Registration no. <input name="registration_no" value="{{ s['registration_no'] }}" maxlength="60"></label>
+      <label>VAT no. <input name="vat_number" value="{{ s['vat_number'] }}" maxlength="60"></label>
+    </div>
+    <label>Logo (PNG or JPG) <input type="file" name="logo" accept="image/png,image/jpeg">
+      {% if s['logo_path'] %}<span class="muted small">A logo is set.</span>{% endif %}</label>
+  </section>
+
+  <section class="card stack-sm">
+    <h2>Invoicing</h2>
+    <div class="grid-2">
+      <label>Currency <input name="currency" value="{{ s['currency'] }}" maxlength="3" pattern="[A-Za-z]{3}"></label>
+      <label>Default VAT rate (%) <input name="default_vat_rate" inputmode="decimal" value="{{ s['default_vat_rate'] }}"></label>
+    </div>
+    <div class="grid-3">
+      <label>Number prefix <input name="invoice_prefix" value="{{ s['invoice_prefix'] }}" maxlength="20"></label>
+      <label>Next number <input name="invoice_next_number" inputmode="numeric" value="{{ s['invoice_next_number'] }}"></label>
+      <label>Digits <input name="invoice_pad" inputmode="numeric" value="{{ s['invoice_pad'] }}"></label>
+    </div>
+    <p class="muted small">Next invoice: {{ s['invoice_prefix'] }}{{ s['invoice_next_number'].zfill(s['invoice_pad']|int) }}. Numbers are assigned at finalization, so drafts never leave gaps.</p>
+    <label>Payment terms (days) <input name="payment_terms_days" inputmode="numeric" value="{{ s['payment_terms_days'] }}"></label>
+    <label>Legal footer <textarea name="legal_footer" rows="2" maxlength="1000" placeholder="Company registration, registered office, VAT reverse-charge wording...">{{ s['legal_footer'] }}</textarea></label>
+  </section>
+
+  <section class="card stack-sm">
+    <h2>Bank &amp; payment</h2>
+    <label>Bank name <input name="bank_name" value="{{ s['bank_name'] }}" maxlength="100"></label>
+    <div class="grid-2">
+      <label>IBAN <input name="bank_iban" value="{{ s['bank_iban'] }}" maxlength="50"></label>
+      <label>BIC <input name="bank_bic" value="{{ s['bank_bic'] }}" maxlength="20"></label>
+    </div>
+    <label>Payment instructions <textarea name="payment_instructions" rows="2" maxlength="1000">{{ s['payment_instructions'] }}</textarea></label>
+  </section>
+
+  <section class="card stack-sm">
+    <h2>Default email</h2>
+    <label>Subject <input name="email_subject" value="{{ s['email_subject'] }}" maxlength="300"></label>
+    <label>Message <textarea name="email_body" rows="7" maxlength="4000">{{ s['email_body'] }}</textarea></label>
+    <p class="muted small">Placeholders: {client_name} {number} {total} {due_date} {business_name}</p>
+  </section>
+
+  <div class="settings-save"><button class="btn btn-primary btn-lg" type="submit">Save settings</button></div>
+</form>
+
+<section class="card">
+  <h2>Demo data</h2>
+  <p class="small muted">Sample clients, services and invoices to explore the app. They are labelled Demo, never send email, and are removed in one click. Your records are never modified.</p>
+  <form method="post" action="{{ url_for('web.settings_demo') }}">
+    <input type="hidden" name="action" value="{{ 'clear' if has_demo else 'add' }}">
+    <button class="btn" type="submit">{{ 'Remove demo data' if has_demo else 'Add demo data' }}</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Recent email activity</h2>
+  {% for e in emails %}
+    <p class="small"><span class="muted">{{ e['attempted_at'] }}</span> · {{ e['status'] }} · {{ e['recipient'] }}{% if e['error'] %} — <span class="error">{{ e['error'] }}</span>{% endif %}</p>
+  {% else %}<p class="muted small">No emails sent yet.</p>{% endfor %}
+</section>
+{% endblock %}

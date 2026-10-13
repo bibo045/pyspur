@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge %}
+{% block title %}{{ inv['number'] }}{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="muted small"><a href="{{ url_for('web.invoice_list') }}">Invoices</a> / {{ inv['number'] }}</p>
+    <h1>{{ inv['number'] }} {{ badge(effective_status) }}</h1>
+    <p class="muted">{{ inv['client_name'] or client_snapshot.get('name', '') }} · issued {{ inv['issue_date']|date }} · due {{ inv['due_date']|date }}</p>
+  </div>
+  <div class="row-gap wrap">
+    <a class="btn" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">Open PDF</a>
+    <a class="btn" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">Print</a>
+    <form method="post" action="{{ url_for('web.invoice_duplicate', invoice_id=inv['id']) }}">
+      <button class="btn" type="submit" data-once>Duplicate</button>
+    </form>
+  </div>
+</header>
+
+<div class="detail-grid">
+  <section class="card">
+    <div class="card-head"><h2>Amounts</h2><span class="strong">{{ inv['total']|money }} {{ inv['currency'] }}</span></div>
+    <table class="table compact">
+      <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">VAT</th><th class="num">Total</th></tr></thead>
+      <tbody>
+      {% for it in items %}
+        <tr>
+          <td>{{ it['description'] }}{% if it['unit'] %} <span class="muted small">({{ it['unit'] }})</span>{% endif %}</td>
+          <td class="num">{{ it['quantity'] }}</td>
+          <td class="num">{{ it['unit_price']|money }}</td>
+          <td class="num">{{ it['vat_rate'] }}%</td>
+          <td class="num">{{ it['line_total']|money }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <dl class="summary inline">
+      <dt>Subtotal excl. VAT</dt><dd>{{ inv['subtotal']|money }}</dd>
+      <dt>VAT</dt><dd>{{ inv['vat_total']|money }}</dd>
+      <dt class="strong">Total</dt><dd class="strong">{{ inv['total']|money }}</dd>
+    </dl>
+    {% if inv['status'] == 'cancelled' %}<p class="notice">Cancelled: {{ inv['cancel_reason'] }}</p>{% endif %}
+  </section>
+
+  <aside class="stack">
+    {% if inv['status'] in ('finalized', 'sent') or effective_status == 'overdue' %}
+    <section class="card">
+      <h2>Email to client</h2>
+      <p class="small">To <strong>{{ client_snapshot.get('email', '') }}</strong></p>
+      {% if mail_ready %}
+      <form method="post" action="{{ url_for('web.invoice_resend', invoice_id=inv['id']) }}" data-once>
+        <label>Subject <input name="subject" value="{{ subject }}" maxlength="300"></label>
+        <label>Message <textarea name="body" rows="6" maxlength="4000">{{ body }}</textarea></label>
+        <button class="btn btn-primary" type="submit">{{ 'Send email' if inv['status'] == 'finalized' else 'Resend email' }}</button>
+      </form>
+      {% else %}
+      <p class="notice small">Email is not connected. <a href="{{ url_for('web.settings_page') }}">Connect email</a> to send this invoice.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if inv['status'] in ('finalized', 'sent') or effective_status == 'overdue' %}
+    <section class="card">
+      <h2>Payment</h2>
+      <form method="post" action="{{ url_for('web.invoice_payment', invoice_id=inv['id']) }}" class="stack-sm">
+        <input type="hidden" name="action" value="paid">
+        <div class="grid-2">
+          <label>Amount received <input name="amount" inputmode="decimal" value="{{ inv['total'] }}" required></label>
+          <label>Date received <input type="date" name="paid_date" value="{{ today.isoformat() }}" required></label>
+        </div>
+        <button class="btn" type="submit" data-once>Mark as paid</button>
+      </form>
+    </section>
+    {% elif inv['status'] == 'paid' %}
+    <section class="card">
+      <h2>Payment</h2>
+      <p class="small">Paid {{ inv['paid_amount']|money }} on {{ inv['paid_date']|date }}.</p>
+      <form method="post" action="{{ url_for('web.invoice_payment', invoice_id=inv['id']) }}">
+        <input type="hidden" name="action" value="unpaid">
+        <button class="btn btn-ghost" type="submit" onclick="return confirm('Reopen this invoice as unpaid?')">Reopen as unpaid</button>
+      </form>
+    </section>
+    {% endif %}
+
+    {% if inv['status'] in ('finalized', 'sent') %}
+    <section class="card">
+      <h2>Cancel invoice</h2>
+      <p class="small muted">Cancelling keeps the number in the sequence and the PDF on record. For a paid invoice, issue a correction instead.</p>
+      <form method="post" action="{{ url_for('web.invoice_cancel', invoice_id=inv['id']) }}" class="stack-sm" onsubmit="return confirm('Cancel this invoice?')">
+        <label>Reason <input name="reason" required minlength="3" maxlength="300"></label>
+        <button class="btn btn-ghost btn-danger" type="submit">Cancel invoice</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <h2>History</h2>
+      <ul class="timeline">
+        <li><span class="muted small">Finalized</span> {{ inv['finalized_at'] or '—' }}</li>
+        {% for e in emails %}
+          <li class="{{ 'bad' if e['status'] == 'failed' }}">
+            <span class="muted small">{{ e['attempted_at'] }}</span>
+            {% if e['status'] == 'sent' %}Emailed to {{ e['recipient'] }}{% else %}Email failed for {{ e['recipient'] }}: {{ e['error'] }}{% endif %}
+          </li>
+        {% else %}
+          <li class="muted">Not emailed yet.</li>
+        {% endfor %}
+        {% if inv['paid_date'] %}<li>Paid {{ inv['paid_date']|date }}</li>{% endif %}
+      </ul>
+    </section>
+  </aside>
+</div>
+{% endblock %}

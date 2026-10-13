@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<header class="page-head">
+  <h1>Invoices</h1>
+  <form method="post" action="{{ url_for('web.invoice_new') }}">
+    <button class="btn btn-primary" type="submit" data-once>Create invoice</button>
+  </form>
+</header>
+<form class="toolbar" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search number or client" aria-label="Search invoices">
+  <select name="status" aria-label="Filter by status">
+    <option value="">All statuses</option>
+    {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if status == s }}>{{ s|capitalize }}</option>{% endfor %}
+  </select>
+  <input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dir }}">
+  <button class="btn" type="submit">Apply</button>
+</form>
+<section class="card">
+<div class="table-wrap">
+<table class="table">
+  <thead>
+    <tr>
+      {% for key, label in [('number','Number'),('client','Client'),('issue','Issued'),('due','Due'),('total','Total')] %}
+      <th class="{{ 'num' if key == 'total' }}">
+        <a href="{{ url_for('web.invoice_list', q=q, status=status, sort=key, dir='asc' if sort == key and dir == 'desc' else 'desc') }}">{{ label }}{% if sort == key %} {{ '↑' if dir == 'asc' else '↓' }}{% endif %}</a>
+      </th>
+      {% endfor %}
+      <th>Status</th><th class="actions">Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] or 'Draft' }}</a></td>
+      <td>{{ r['client_name'] or '—' }}</td>
+      <td>{{ r['issue_date']|date }}</td>
+      <td>{{ r['due_date']|date }}</td>
+      <td class="num">{{ r['total']|money }}</td>
+      <td>{{ badge(effective(r)) }}</td>
+      <td class="actions">
+        {% if r['status'] == 'draft' %}
+          <a href="{{ url_for('web.invoice_edit', invoice_id=r['id']) }}">Continue</a>
+        {% else %}
+          <a href="{{ url_for('web.invoice_download', invoice_id=r['id']) }}" target="_blank" rel="noopener">PDF</a>
+          <a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">Open</a>
+        {% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8"><div class="empty">No invoices match these filters.</div></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+{% if pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  {% if page > 1 %}<a href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page-1) }}">← Previous</a>{% endif %}
+  <span class="muted">Page {{ page }} of {{ pages }} · {{ total_rows }} invoices</span>
+  {% if page < pages %}<a href="{{ url_for('web.invoice_list', q=q, status=status, sort=sort, dir=dir, page=page+1) }}">Next →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

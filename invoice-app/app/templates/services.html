@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Services & pricing{% endblock %}
+{% block content %}
+<header class="page-head"><h1>Services &amp; pricing</h1><a class="btn btn-primary" href="{{ url_for('web.service_form') }}">Add service</a></header>
+<label class="inline-check muted small"><input type="checkbox" {{ 'checked' if show_archived }} onchange="location.href='{{ url_for('web.services') }}' + (this.checked ? '?archived=1' : '')"> Show archived</label>
+<section class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Service</th><th>Unit</th><th class="num">Unit price</th><th class="num">VAT</th><th class="actions">Actions</th></tr></thead>
+  <tbody>
+  {% for s in rows %}
+    <tr>
+      <td><strong>{{ s['name'] }}</strong>{% if s['description'] %}<br><span class="muted small">{{ s['description'] }}</span>{% endif %}</td>
+      <td>{{ s['unit'] }}</td>
+      <td class="num">{{ s['unit_price']|money }}</td>
+      <td class="num">{{ s['vat_rate'] }}%</td>
+      <td class="actions">
+        <a href="{{ url_for('web.service_form', service_id=s['id']) }}">Edit</a>
+        <form method="post" action="{{ url_for('web.service_archive', service_id=s['id']) }}" class="inline">
+          <input type="hidden" name="restore" value="{{ '1' if show_archived else '0' }}">
+          <button class="link" type="submit">{{ 'Restore' if show_archived else 'Archive' }}</button>
+        </form>
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5"><div class="empty">{{ 'No archived services.' if show_archived else 'No services yet. Save the services you sell often so future invoices take seconds.' }}</div></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div></section>
+{% endblock %}
