@@ -109,7 +109,7 @@
       {% set steps = [('Created', True), ('Finalized', inv['status'] != 'draft' and inv['status'] != 'cancelled'), ('Sent', inv['status'] in ('sent', 'paid') or effective_status == 'overdue'), ('Paid', inv['status'] == 'paid')] %}
       <ol class="mt-4 flex items-center justify-between gap-1" aria-label="Invoice progress">
         {% for label, done in steps %}
-        <li class="flex flex-1 flex-col items-center gap-1.5 text-center text-[11px] {{ 'text-foreground' if done else 'text-muted-foreground' }}">
+        <li class="flex flex-1 flex-col items-center gap-1.5 text-center text-xs {{ 'text-foreground' if done else 'text-muted-foreground' }}">
           <span class="grid h-7 w-7 place-items-center rounded-full {{ 'bg-primary text-primary-foreground' if done else 'border border-border-strong bg-surface' }}">{{ icon('check', 'h-3.5 w-3.5') if done }}</span>
           {{ label }}
         </li>

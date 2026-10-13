@@ -23,7 +23,7 @@
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-info-soft text-info">{{ icon('mail', 'h-5 w-5') }}</span>
           <div><p class="font-medium">Email with PDF</p><p class="text-xs text-muted-foreground">To {{ inv['client_email'] }}</p></div></div>
-        <span class="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">Recommended</span>
+        <span class="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">Recommended</span>
       </div>
       {% if not mail_ready %}
         <p class="rounded-xl bg-warning-soft p-3 text-sm">Email isn't connected yet. <a class="font-medium underline" href="{{ url_for('web.settings_page') }}#email">Connect email</a> to send from the app.</p>

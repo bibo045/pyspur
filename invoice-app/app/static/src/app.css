@@ -13,6 +13,11 @@
 @theme {
   --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  /* Type floor. Caption 13px (was 12px), body 15px, never below 13px on phones. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   /* Neutrals: warm paper and ink, slightly tinted toward teal so they sit well with the accent. */
@@ -160,6 +165,6 @@
   }
   .menu-item.destructive { @apply text-destructive; }
   /* Mobile: the bottom tab bar. Respects the iPhone home indicator. */
-  .tab-item { @apply flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground transition-colors; }
+  .tab-item { @apply flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors; }
   .tab-item[aria-current="page"] { @apply text-primary; }
 }

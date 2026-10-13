@@ -46,7 +46,7 @@
 {%- set base = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] font-medium transition-colors duration-150 select-none disabled:pointer-events-none disabled:opacity-50 cursor-pointer' -%}
 {%- set variants = {
   'primary': 'bg-primary text-primary-foreground hover:bg-primary-hover shadow-[0_1px_1px_oklch(0.2_0.01_75_/_0.12)]',
-  'secondary': 'bg-surface text-foreground border border-border-strong hover:bg-muted',
+  'secondary': 'bg-surface text-foreground border-[1.5px] border-foreground/35 hover:bg-muted hover:border-foreground/60',
   'ghost': 'text-muted-foreground hover:bg-muted hover:text-foreground',
   'destructive': 'bg-destructive text-destructive-foreground hover:opacity-90',
   'danger-outline': 'bg-surface text-destructive border border-border-strong hover:bg-destructive/5',
