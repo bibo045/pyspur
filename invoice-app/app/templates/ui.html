@@ -51,7 +51,7 @@
   'destructive': 'bg-destructive text-destructive-foreground hover:opacity-90',
   'danger-outline': 'bg-surface text-destructive border border-border-strong hover:bg-destructive/5',
 } -%}
-{%- set sizes = {'sm': 'h-8 px-2.5 text-[13px]', 'md': 'h-9 px-3.5 text-sm', 'lg': 'h-11 px-5 text-[15px]', 'icon': 'h-8 w-8'} -%}
+{%- set sizes = {'sm': 'h-8 px-2.5 text-[13px]', 'md': 'h-9 px-3.5 text-sm', 'lg': 'h-11 px-5 text-[15px]', 'icon': 'h-11 w-11 sm:h-8 sm:w-8'} -%}
 {{ base }} {{ variants[variant] }} {{ sizes[size] }} {{ extra }}
 {%- endmacro %}
 
@@ -106,8 +106,9 @@
 
 {# Confirmation dialog. Opened by any element with data-confirm-open="<dialog id>". #}
 {% macro confirm_dialog(id, title, body, action, method='post', confirm_label='Confirm', variant='destructive') -%}
-<dialog id="{{ id }}" class="m-auto w-[min(92vw,26rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-foreground shadow-[var(--shadow-pop)]" aria-labelledby="{{ id }}-title">
-  <form method="{{ method }}" action="{{ action }}" class="flex flex-col gap-4 p-5" data-once>
+<dialog id="{{ id }}" class="m-auto w-[min(92vw,26rem)] rounded-[var(--radius-card)] border border-border bg-surface p-0 text-foreground shadow-[var(--shadow-pop)] max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:m-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:rounded-t-2xl" aria-labelledby="{{ id }}-title">
+  <div class="mx-auto mt-2 h-1 w-9 rounded-full bg-border-strong sm:hidden" aria-hidden="true"></div>
+  <form method="{{ method }}" action="{{ action }}" class="flex flex-col gap-4 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]" data-once>
     {{ caller() if caller else '' }}
     <div class="flex flex-col gap-1.5">
       <h2 id="{{ id }}-title" class="text-base font-semibold">{{ title }}</h2>

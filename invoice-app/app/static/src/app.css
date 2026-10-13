@@ -11,7 +11,8 @@
  * has built with it. Only this block holds raw colour values.
  */
 @theme {
-  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Platform system font first for controls and body text (HIG: use the system face); brand serif stays for titles. */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Instrument Sans", sans-serif;
   --font-display: "Instrument Serif", ui-serif, Georgia, serif;
   /* Type floor. Caption 13px (was 12px), body 15px, never below 13px on phones. */
   --text-xs: 0.8125rem;
