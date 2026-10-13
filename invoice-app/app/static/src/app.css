@@ -15,27 +15,49 @@
   --font-display: "Instrument Serif", ui-serif, Georgia, serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  --color-background: oklch(0.985 0.005 85);      /* warm paper */
+  /* Neutrals: warm paper and ink, slightly tinted toward teal so they sit well with the accent. */
+  --color-background: oklch(0.985 0.006 95);
   --color-surface: oklch(1 0 0);
-  --color-foreground: oklch(0.22 0.01 75);         /* ink */
-  --color-muted: oklch(0.965 0.007 85);
-  --color-muted-foreground: oklch(0.47 0.01 75);
-  --color-border: oklch(0.91 0.008 80);
-  --color-border-strong: oklch(0.84 0.01 80);
-  --color-primary: oklch(0.36 0.06 165);           /* ink spruce, actions and focus only */
+  --color-foreground: oklch(0.25 0.035 265);
+  --color-muted: oklch(0.965 0.008 95);
+  --color-muted-foreground: oklch(0.45 0.012 230);
+  --color-border: oklch(0.915 0.008 200);
+  --color-border-strong: oklch(0.84 0.01 200);
+
+  /* Brand: deep navy for actions, soft lavender for the creation action and highlights. */
+  --color-primary: oklch(0.27 0.05 265);
   --color-primary-foreground: oklch(0.99 0 0);
-  --color-primary-hover: oklch(0.31 0.06 165);
-  --color-ring: oklch(0.5 0.08 165);
-  --color-destructive: oklch(0.52 0.16 28);        /* brick */
+  --color-primary-hover: oklch(0.22 0.05 265);
+  --color-primary-soft: oklch(0.95 0.015 265);
+  --color-ring: oklch(0.55 0.1 265);
+  --color-accent: oklch(0.84 0.07 290);
+  --color-accent-foreground: oklch(0.27 0.05 265);
+  --color-accent-soft: oklch(0.96 0.02 290);
+  --color-doc-canvas: oklch(0.935 0.025 290);
+
+  /* Status colours. Each one is always paired with a text label. */
+  --color-success: oklch(0.42 0.09 155);
+  --color-success-soft: oklch(0.955 0.04 155);
+  --color-info: oklch(0.42 0.07 245);
+  --color-info-soft: oklch(0.95 0.03 245);
+  --color-warning: oklch(0.5 0.12 70);
+  --color-warning-soft: oklch(0.97 0.05 85);
+  --color-destructive: oklch(0.48 0.18 25);
   --color-destructive-foreground: oklch(0.99 0 0);
-  --color-success: oklch(0.5 0.1 155);
-  --color-info: oklch(0.45 0.06 245);              /* slate */
-  --color-warning: oklch(0.6 0.12 70);
+  --color-destructive-soft: oklch(0.96 0.03 25);
+
+  /* Illustration palette: used only in drawings and empty states. */
+  --color-violet: oklch(0.6 0.12 300);
+  --color-violet-soft: oklch(0.955 0.03 300);
+  --color-amber: oklch(0.86 0.12 85);
+  --color-sky: oklch(0.82 0.07 235);
+  --color-sand: oklch(0.92 0.02 80);
 
   --radius-control: 0.375rem;
   --radius-card: 0.625rem;
-  --shadow-card: 0 1px 2px oklch(0.2 0.01 75 / 0.05);
-  --shadow-pop: 0 8px 24px -8px oklch(0.2 0.01 75 / 0.18), 0 2px 6px oklch(0.2 0.01 75 / 0.06);
+  --shadow-card: 0 1px 2px oklch(0.25 0.02 230 / 0.05);
+  --shadow-pop: 0 8px 24px -8px oklch(0.25 0.02 230 / 0.2), 0 2px 6px oklch(0.25 0.02 230 / 0.06);
+  --shadow-fab: 0 8px 20px -6px oklch(0.27 0.05 265 / 0.55);
 }
 
 @layer base {
@@ -47,10 +69,75 @@
   :focus-visible { outline: 2px solid var(--color-ring); outline-offset: 2px; border-radius: 4px; }
   [hidden] { display: none !important; }
   h1, h2, h3 { text-wrap: balance; }
-  dialog::backdrop { background: oklch(0.2 0.01 75 / 0.32); }
+  dialog::backdrop { background: oklch(0.25 0.02 230 / 0.32); }
 }
 
 @layer components {
+  /* Invoice document. Matches the PDF structure per template. */
+  .doc { @apply relative bg-white text-[#1d2233] rounded-[4px] p-7 text-[13px] leading-relaxed shadow-[0_1px_2px_oklch(0.25_0.02_230/0.08),0_12px_32px_-16px_oklch(0.25_0.02_230/0.25)]; font-family: var(--font-sans); }
+  .doc .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .doc p { margin: 0; }
+  .doc-meta { @apply text-[12px] text-[#6b7180]; }
+  .doc-strong { @apply font-semibold; }
+  .doc-label { @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--doc-accent)]; }
+  .doc-biz { @apply text-[15px] font-semibold; }
+  .doc-title { @apply font-display text-[30px] leading-none; color: var(--doc-accent); }
+  .doc-title-sm { @apply font-display text-[24px] leading-none; color: var(--doc-accent); }
+  .doc-num { @apply text-[12px] font-semibold tabular-nums; }
+  .doc-two { @apply mt-4 flex justify-between gap-4; }
+  .doc-right { @apply text-right; }
+  .doc-head { @apply pb-5; }
+  .doc-band { @apply -mx-7 -mt-7 mb-5 flex items-center justify-between px-7 py-5 text-white; background: var(--doc-accent); }
+  .doc-band .doc-title { color: #fff; font-size: 24px; }
+  .doc-band .doc-num { color: #fff; }
+  .doc-block { @apply -mx-7 -mt-7 mb-5 px-7 py-6; background: var(--doc-accent); }
+  .doc-block .doc-title { color: #fff; font-size: 34px; }
+  .doc-center { @apply text-center; }
+  .doc-center .doc-title { font-size: 28px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .doc-rule { @apply mt-3 border-t border-[#e5e2da] pt-3; }
+  .doc-billto { @apply mb-5; }
+  .doc-table { @apply w-full border-collapse text-[12.5px]; table-layout: fixed; }
+  .doc-table th:nth-child(1) { width: 40%; } .doc-table th:nth-child(2) { width: 10%; }
+  .doc-table th:nth-child(3) { width: 19%; } .doc-table th:nth-child(4) { width: 12%; } .doc-table th:nth-child(5) { width: 19%; }
+  .doc-table td { overflow-wrap: anywhere; }
+  .doc-table td.n, .doc-table th.n { white-space: nowrap; }
+  @media (max-width: 480px) {
+    .doc { @apply p-5 text-[12px]; }
+    .doc-table { @apply text-[11px]; }
+    .doc-table th { @apply text-[9px] tracking-wide; }
+    .doc-table th, .doc-table td { padding-left: 2px; padding-right: 2px; }
+    .doc-totals { @apply w-full text-[11.5px]; }
+  }
+  /* Gallery: sheets are laid out at 360px and scaled to fit their card by app.js. */
+  .gallery-sheet { width: 360px; transform-origin: top left; }
+  .gallery-sheet .doc-foot { display: none; }
+  .doc-table th { @apply py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-[#6b7180]; }
+  .doc-table th.n { text-align: right; }
+  .doc-table td { @apply py-2.5 align-top; }
+  .doc-table th, .doc-table td { border-bottom: 1px solid #e7e4dc; }
+  .doc-t-grid .doc-table th { background: var(--doc-accent); color: #fff; border: 0; }
+  .doc-t-zebra .doc-table tbody tr:nth-child(even) td { background: #f5f3ef; }
+  .doc-t-zebra .doc-table th { background: var(--doc-accent); color: #fff; border: 0; }
+  .doc-t-hairline .doc-table th { border-bottom: 1.5px solid var(--doc-accent); }
+  .doc-totals { @apply mt-4 ml-auto w-[62%] space-y-1.5 text-[12.5px]; }
+  .doc-totals > div { @apply flex justify-between; }
+  .doc-grand { @apply mt-2 border-t pt-2 text-[14px] font-semibold; border-color: var(--doc-accent); color: var(--doc-accent); }
+  .doc-modern .doc-totals { @apply rounded-lg p-3 w-full; background: color-mix(in oklch, var(--doc-accent) 7%, white); }
+  .doc-modern .doc-grand { border-top: 0; }
+  .doc-foot { @apply mt-6 space-y-1 border-t border-[#e7e4dc] pt-4 text-[12px] text-[#4a4f5e]; }
+  .doc-mini { @apply p-4 text-[9px] shadow-none; width: 100%; }
+  .doc-mini .doc-title { font-size: 16px; }
+  .doc-mini .doc-biz { font-size: 10px; }
+  .doc-mini .doc-band, .doc-mini .doc-block { @apply -mx-4 -mt-4 px-4 py-3; }
+  .doc-mini .doc-table { font-size: 8px; }
+  .doc-mini .doc-totals { font-size: 8.5px; }
+  .doc-mini .doc-table th, .doc-mini .doc-table td { padding: 3px 2px; }
+  .doc-mini .doc-meta { font-size: 8px; }
+  .doc-mini .doc-grand { font-size: 9px; }
+  .doc-mini .doc-head { padding-bottom: 6px; }
+  .doc-mini .doc-two { margin-top: 6px; }
+  .doc-mini .doc-billto { margin-bottom: 6px; }
+
   /* Numbers line up in columns. */
   .num { font-variant-numeric: tabular-nums; text-align: right; }
 
@@ -60,7 +147,7 @@
       placeholder:text-muted-foreground shadow-none transition-[border-color,box-shadow] duration-150;
     min-height: 2.25rem;
   }
-  .field:focus { outline: none; border-color: var(--color-ring); box-shadow: 0 0 0 3px oklch(0.5 0.08 165 / 0.18); }
+  .field:focus { outline: none; border-color: var(--color-ring); box-shadow: 0 0 0 3px oklch(0.56 0.1 190 / 0.2); }
   .field[aria-invalid="true"] { border-color: var(--color-destructive); }
   .field-sm { @apply px-2 py-1 text-sm; min-height: 2rem; height: 2rem; }
   .label { @apply block text-xs font-medium text-muted-foreground; }
@@ -72,4 +159,7 @@
       hover:bg-muted focus:bg-muted cursor-pointer disabled:opacity-50;
   }
   .menu-item.destructive { @apply text-destructive; }
+  /* Mobile: the bottom tab bar. Respects the iPhone home indicator. */
+  .tab-item { @apply flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground transition-colors; }
+  .tab-item[aria-current="page"] { @apply text-primary; }
 }

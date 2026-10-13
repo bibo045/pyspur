@@ -19,7 +19,23 @@ The visual system is described in [DESIGN.md](DESIGN.md).
 Data is stored in `data/invoices.sqlite3`, PDFs in `data/pdfs/`, and logos in `data/uploads/`.
 Set `INVOICE_DB` to use a different database file.
 
-## Connect email (required before finalizing)
+## Mobile app
+
+Invo is mobile-first. On phones it uses a bottom tab bar (Home, Invoices, a central button to create an invoice, Clients, More). On tablets and desktops it uses a sidebar. The app can be installed to a home screen: it ships a web app manifest, icons and a service worker that caches static files only. Invoice data is never cached.
+
+Screens: welcome, home, invoice builder (client, services, details, template, review), template gallery with live previews, document preview, send (email with PDF, or WhatsApp), confirmation, invoice history with status tracking, clients, services, and settings.
+
+## WhatsApp sharing
+
+WhatsApp sharing opens a chat with a link to the invoice PDF. The link is a public, unguessable URL created per invoice. Set the public address of the server so the link works on the client's phone:
+
+```bash
+export PUBLIC_BASE_URL=https://invoices.yourdomain.com
+```
+
+The client needs a phone number with country code. Finalizing does not need email; you can finalize and share on WhatsApp.
+
+## Connect email (required to send by email)
 
 Credentials live only in server environment variables. They are never sent to the browser.
 
@@ -73,7 +89,7 @@ The email tests use a real SMTP server on localhost, so they check the actual me
 
 ## Limits and decisions to know about
 
-- **No login.** This is a single-user app. Put it behind your own authentication (SSO, a reverse proxy with basic auth, or a login layer) before exposing it to the internet.
+- **No login.** This is a single-user app. Share links are public by design (unguessable tokens), but the rest of the app is not. Put it behind your own authentication (SSO, a reverse proxy with basic auth, or a login layer) before exposing it to the internet.
 - **Partial payments** are not supported yet. Payments must equal the invoice total.
 - **Corrections** are cancel-and-reissue. Credit notes are not implemented.
 - **Delivery status** means the provider accepted the message. Bounces and opens are not tracked; a provider webhook would be needed for that.

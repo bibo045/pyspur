@@ -18,18 +18,23 @@ from reportlab.platypus import (Image, KeepTogether, Paragraph, SimpleDocTemplat
 
 from .money import cents, fmt, to_decimal
 
+# Each template has a gallery category (Modern, Minimal, Classic, Bold). The keys are stable: they are
+# stored in settings and on invoices, so renaming a label is safe but changing a key is not.
 TEMPLATES = {
-    "minimal": {"label": "Minimal & modern", "desc": "Airy layout, a single accent colour, hairline rules.",
+    "modern": {"label": "Modern", "category": "Modern", "desc": "Sans-serif, navy accent, tinted totals panel.",
+               "header": "left", "table": "hairline", "accent_default": "#1C2B4A", "font": "Helvetica"},
+    "minimal": {"label": "Minimal", "category": "Minimal", "desc": "Airy layout, one accent, hairline rules.",
                 "header": "left", "table": "lines", "accent_default": "#1F4E79", "font": "Helvetica"},
-    "corporate": {"label": "Corporate & formal", "desc": "Solid header band and boxed totals.",
+    "corporate": {"label": "Classic", "category": "Classic", "desc": "Solid header band and boxed totals.",
                   "header": "band", "table": "grid", "accent_default": "#1B3A5C", "font": "Helvetica"},
-    "elegant": {"label": "Elegant & premium", "desc": "Serif type, spaced capitals, fine gold-toned rules.",
+    "elegant": {"label": "Elegant", "category": "Classic", "desc": "Serif type, spaced capitals, fine rules.",
                 "header": "centered", "table": "hairline", "accent_default": "#8A6D3B", "font": "Times-Roman"},
-    "creative": {"label": "Creative & colourful", "desc": "Bold colour block and tinted rows.",
+    "creative": {"label": "Bold", "category": "Bold", "desc": "Strong colour block and tinted rows.",
                  "header": "block", "table": "zebra", "accent_default": "#E4572E", "font": "Helvetica"},
-    "bw": {"label": "Clean black & white", "desc": "Monochrome, printer-friendly, no colour.",
+    "bw": {"label": "Black & white", "category": "Minimal", "desc": "Monochrome, printer-friendly.",
            "header": "left", "table": "lines", "accent_default": "#000000", "font": "Helvetica"},
 }
+CATEGORIES = ["Modern", "Minimal", "Classic", "Bold"]
 
 FONT_FAMILIES = {
     "Helvetica": ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique"),

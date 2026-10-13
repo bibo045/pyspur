@@ -1,0 +1,71 @@
+{# The invoice document as HTML. It mirrors the PDF layout for each template, so previews match the export.
+   Pass: doc (render data), key (template key), accent (hex), spec (TEMPLATES entry), mini (bool, gallery thumbnails). #}
+{% from "ui.html" import icon %}
+{% macro sheet(doc, key, accent, spec, mini=False) -%}
+{%- set header = spec.get('header', 'left') -%}
+{%- set table = spec.get('table', 'lines') -%}
+<article class="doc doc-{{ key }} doc-h-{{ header }} doc-t-{{ table }} {{ 'doc-mini' if mini }}" style="--doc-accent: {{ accent }}" aria-label="Invoice {{ doc.number }}">
+  <div class="doc-head">
+    {% if header == 'band' %}
+      <div class="doc-band"><span class="doc-title">Invoice</span><span class="doc-num">{{ doc.number }}</span></div>
+      <div class="doc-two">
+        <div><p class="doc-biz">{{ doc.seller.business_name or 'Your business' }}</p>{% if doc.seller.business_address %}<p class="doc-meta">{{ doc.seller.business_address }}</p>{% endif %}</div>
+        <div class="doc-right"><p class="doc-meta">Issued {{ doc.issue_date|date }}</p><p class="doc-meta">Due {{ doc.due_date|date }}</p></div>
+      </div>
+    {% elif header == 'block' %}
+      <div class="doc-block"><span class="doc-title">INVOICE</span></div>
+      <div class="doc-two">
+        <div><p class="doc-biz">{{ doc.seller.business_name or 'Your business' }}</p>{% if doc.seller.business_address %}<p class="doc-meta">{{ doc.seller.business_address }}</p>{% endif %}</div>
+        <div class="doc-right"><p class="doc-meta">{{ doc.number }}</p><p class="doc-meta">Due {{ doc.due_date|date }}</p></div>
+      </div>
+    {% elif header == 'centered' %}
+      <div class="doc-center">
+        <p class="doc-title">Invoice</p>
+        <p class="doc-biz">{{ doc.seller.business_name or 'Your business' }}</p>
+        {% if doc.seller.business_address %}<p class="doc-meta">{{ doc.seller.business_address }}</p>{% endif %}
+        <p class="doc-meta doc-rule">{{ doc.number }} · {{ doc.issue_date|date }} · due {{ doc.due_date|date }}</p>
+      </div>
+    {% else %}
+      <div class="doc-two">
+        <div><p class="doc-biz">{{ doc.seller.business_name or 'Your business' }}</p>{% if doc.seller.business_address %}<p class="doc-meta">{{ doc.seller.business_address }}</p>{% endif %}{% if doc.seller.vat_number %}<p class="doc-meta">VAT {{ doc.seller.vat_number }}</p>{% endif %}</div>
+        <div class="doc-right"><p class="doc-title-sm">Invoice</p><p class="doc-meta">{{ doc.number }}</p><p class="doc-meta">Issued {{ doc.issue_date|date }}</p><p class="doc-meta">Due {{ doc.due_date|date }}</p></div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="doc-billto">
+    <p class="doc-label">Bill to</p>
+    <p class="doc-strong">{{ doc.client.name }}</p>
+    {% if doc.client.billing_address %}<p class="doc-meta">{{ doc.client.billing_address }}</p>{% endif %}
+  </div>
+
+  <table class="doc-table">
+    <thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Price</th><th class="n">VAT</th><th class="n">Amount</th></tr></thead>
+    <tbody>
+    {% for it in doc['items'] %}
+      <tr>
+        <td>{{ it.description }}{% if it.unit %} <span class="doc-meta">({{ it.unit }})</span>{% endif %}</td>
+        <td class="n">{{ it.quantity }}</td>
+        <td class="n">{{ it.unit_price|money }}</td>
+        <td class="n">{{ it.vat_rate }}%</td>
+        <td class="n">{{ it.line_net|money }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="doc-totals">
+    <div><span>Subtotal excl. VAT</span><span class="n">{{ doc.totals.subtotal|money }}</span></div>
+    {% for vb in doc.vat_breakdown %}<div><span>VAT {{ vb.rate }}%</span><span class="n">{{ vb.vat|money }}</span></div>{% endfor %}
+    <div class="doc-grand"><span>Total payable</span><span class="n">{{ doc.totals.total|money }} {{ doc.currency }}</span></div>
+  </div>
+
+  {% if not mini %}
+  <div class="doc-foot">
+    {% if doc.payment_terms %}<p>{{ doc.payment_terms }}</p>{% endif %}
+    {% if doc.bank.bank_iban %}<p>IBAN {{ doc.bank.bank_iban }}{% if doc.bank.bank_bic %} · BIC {{ doc.bank.bank_bic }}{% endif %}</p>{% endif %}
+    {% if doc.legal_footer %}<p class="doc-meta">{{ doc.legal_footer }}</p>{% endif %}
+  </div>
+  {% endif %}
+</article>
+{%- endmacro %}

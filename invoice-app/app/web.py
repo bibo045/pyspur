@@ -6,7 +6,7 @@ import re
 from decimal import Decimal
 
 from flask import (Blueprint, Response, abort, flash, g, jsonify, redirect, render_template, request,
-                   url_for)
+                   send_file, url_for)
 from werkzeug.utils import secure_filename
 
 from . import db as dbmod
@@ -71,6 +71,46 @@ def inject_globals():
 
 
 # ---------------------------------------------------------------- dashboard
+def _monthly_totals(rows, today, months=6):
+    """Invoiced totals for the last N months, oldest first. Used for the sparkline."""
+    buckets = []
+    year, month = today.year, today.month
+    for _ in range(months):
+        buckets.append(f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            month, year = 12, year - 1
+    buckets.reverse()
+    totals = {b: Decimal("0") for b in buckets}
+    for r in rows:
+        if r["status"] == "cancelled":
+            continue
+        key = r["issue_date"][:7]
+        if key in totals:
+            totals[key] += to_decimal(r["total"], allow_negative=True)
+    return [float(totals[b]) for b in buckets]
+
+
+@bp.get("/welcome")
+def welcome():
+    return render_template("welcome.html")
+
+
+@bp.get("/more")
+def more():
+    return render_template("more.html")
+
+
+@bp.get("/sw.js")
+def service_worker():
+    """Served from the root so the worker controls the whole app. Caches static files only."""
+    path = os.path.join(os.path.dirname(__file__), "static", "sw.js")
+    resp = send_file(path, mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 @bp.get("/favicon.ico")
 def favicon():
     return Response(status=204)
@@ -103,10 +143,15 @@ def dashboard():
                 overdue += total
                 overdue_count += 1
     recent = rows[:8]
+    outstanding_count = sum(1 for r in rows if r["status"] in ("finalized", "sent"))
+    counts = {k: sum(1 for r in g.db.execute("SELECT status FROM invoices").fetchall() if r["status"] == k)
+              for k in ("draft", "sent", "paid")}
+    spark = _monthly_totals(rows, today, months=6)
     overdue_rows = [r for r in rows if inv.effective_status(r, today) == "overdue"][:5]
     return render_template("dashboard.html", month_total=month_total, outstanding=outstanding,
                            paid=paid, paid_count=paid_count, overdue=overdue,
                            overdue_count=overdue_count, recent=recent, overdue_rows=overdue_rows,
+                           outstanding_count=outstanding_count, counts=counts, spark=spark,
                            has_demo=bool(g.db.execute("SELECT 1 FROM clients WHERE is_demo=1").fetchone()),
                            setup_ok=bool(settings()["business_name"]) and mailer.is_configured())
 
@@ -157,8 +202,9 @@ def invoice_detail(invoice_id):
         return redirect(url_for("web.invoice_edit", invoice_id=invoice_id))
     items = g.db.execute("SELECT * FROM invoice_items WHERE invoice_id=? ORDER BY position", (invoice_id,)).fetchall()
     emails = g.db.execute("SELECT * FROM email_log WHERE invoice_id=? ORDER BY id DESC", (invoice_id,)).fetchall()
+    activity = g.db.execute("SELECT * FROM activity WHERE invoice_id=? ORDER BY id DESC", (invoice_id,)).fetchall()
     subject, body = inv.render_email(settings(), g.db, invoice_id)
-    return render_template("invoice_detail.html", inv=row, items=items, emails=emails,
+    return render_template("invoice_detail.html", inv=row, items=items, emails=emails, activity=activity,
                            effective_status=inv.effective_status(row), subject=subject, body=body,
                            client_snapshot=json.loads(row["client_snapshot"] or "{}"))
 
@@ -232,10 +278,14 @@ def api_finalize_send(invoice_id):
             number = g.db.execute("SELECT number FROM invoices WHERE id=?", (invoice_id,)).fetchone()["number"]
         else:
             return _json_error("This invoice has already been sent. Use Resend from the invoice page.", 409)
+        if not body.get("send", True):
+            # Finalize only: the invoice is issued and the user picks how to send it on the send screen.
+            return jsonify({"ok": True, "number": number, "sent": False,
+                            "redirect": url_for("web.invoice_send", invoice_id=invoice_id)})
         stage = "send"
         result = inv.send(g.db, invoice_id, settings(), subject, text)
         return jsonify({"ok": True, "number": number, "sent": True, "recipient": result["recipient"],
-                        "redirect": url_for("web.invoice_detail", invoice_id=invoice_id)})
+                        "redirect": url_for("web.invoice_sent", invoice_id=invoice_id, via="email", to=result["recipient"])})
     except inv.ValidationFailed as e:
         return _json_error(str(e), 422, e.errors)
     except inv.BusinessError as e:
@@ -254,6 +304,96 @@ def invoice_preview(invoice_id):
         abort(404)
     data = inv.get_pdf_bytes(g.db, invoice_id, settings())
     return _pdf_response(data, "preview.pdf")
+
+
+@bp.get("/invoices/<int:invoice_id>/review")
+def invoice_review(invoice_id):
+    """The invoice as it will be exported: the real data rendered in the chosen template."""
+    row = g.db.execute("SELECT i.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone "
+                       "FROM invoices i LEFT JOIN clients c ON c.id = i.client_id WHERE i.id=?", (invoice_id,)).fetchone()
+    if row is None:
+        abort(404)
+    s_ = settings()
+    data = inv.load_render_data(g.db, invoice_id, s_)
+    return render_template("invoice_review.html", inv=row, doc=data, tpl=pdfmod.TEMPLATES.get(row["template"]),
+                           opts=json.loads(row["template_options"] or "{}"), templates=pdfmod.TEMPLATES)
+
+
+@bp.get("/invoices/<int:invoice_id>/send")
+def invoice_send(invoice_id):
+    row = g.db.execute("SELECT i.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone "
+                       "FROM invoices i LEFT JOIN clients c ON c.id = i.client_id WHERE i.id=?", (invoice_id,)).fetchone()
+    if row is None:
+        abort(404)
+    if row["status"] == "draft":
+        return redirect(url_for("web.invoice_edit", invoice_id=invoice_id))
+    subject, body = inv.render_email(settings(), g.db, invoice_id)
+    return render_template("invoice_send.html", inv=row, subject=subject, body=body,
+                           has_phone=bool(row["client_phone"]), mail_ready=mailer.is_configured(),
+                           public_base=os.environ.get("PUBLIC_BASE_URL", ""))
+
+
+@bp.post("/invoices/<int:invoice_id>/send/email")
+def invoice_send_email(invoice_id):
+    subject = (request.form.get("subject") or "").strip() or None
+    text = (request.form.get("body") or "").strip() or None
+    try:
+        result = inv.send(g.db, invoice_id, settings(), subject, text)
+    except inv.BusinessError as e:
+        flash(str(e), "error")
+        return redirect(url_for("web.invoice_send", invoice_id=invoice_id))
+    return redirect(url_for("web.invoice_sent", invoice_id=invoice_id, via="email", to=result["recipient"]))
+
+
+@bp.post("/invoices/<int:invoice_id>/send/whatsapp")
+def invoice_send_whatsapp(invoice_id):
+    row = g.db.execute("SELECT i.*, c.phone AS client_phone FROM invoices i LEFT JOIN clients c ON c.id = i.client_id WHERE i.id=?",
+                       (invoice_id,)).fetchone()
+    if row is None:
+        abort(404)
+    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    try:
+        token = inv.ensure_share_token(g.db, invoice_id)
+        link = f"{base}/share/{token}.pdf" if base else url_for("web.public_pdf", token=token, _external=True)
+        message = f"Hi, here is invoice {row['number']} for {row['total']} {row['currency']}, due {row['due_date']}: {link}"
+        target = inv.whatsapp_link(row["client_phone"], message)
+    except inv.BusinessError as e:
+        flash(str(e), "error")
+        return redirect(url_for("web.invoice_send", invoice_id=invoice_id))
+    with dbmod.transaction(g.db):
+        inv.log_activity(g.db, invoice_id, "whatsapp_shared", row["client_phone"])
+    return redirect(target)
+
+
+@bp.get("/invoices/<int:invoice_id>/sent")
+def invoice_sent(invoice_id):
+    row = g.db.execute("SELECT i.*, c.name AS client_name FROM invoices i LEFT JOIN clients c ON c.id = i.client_id WHERE i.id=?",
+                       (invoice_id,)).fetchone()
+    if row is None:
+        abort(404)
+    via = request.args.get("via", "email")
+    return render_template("invoice_sent.html", inv=row, via=via, to=request.args.get("to", ""))
+
+
+@bp.get("/share/<token>.pdf")
+def public_pdf(token):
+    """Public read-only link to a finalized invoice PDF. Only the unguessable token grants access."""
+    row = g.db.execute("SELECT id, number FROM invoices WHERE share_token=? AND status != 'draft'", (token,)).fetchone()
+    if row is None:
+        abort(404)
+    return _pdf_response(inv.get_pdf_bytes(g.db, row["id"], settings()), f"{row['number']}.pdf", inline=True)
+
+
+@bp.post("/invoices/<int:invoice_id>/share")
+def invoice_share(invoice_id):
+    try:
+        token = inv.ensure_share_token(g.db, invoice_id)
+    except inv.BusinessError as e:
+        flash(str(e), "error")
+        return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
+    link = url_for("web.public_pdf", token=token, _external=True)
+    flash(f"Share link created: {link}", "success")
+    return redirect(url_for("web.invoice_detail", invoice_id=invoice_id))
 
 
 @bp.get("/invoices/<int:invoice_id>/download")
@@ -327,6 +467,7 @@ def _client_form_values(src):
     return {
         "name": (src.get("name") or "").strip()[:150],
         "email": (src.get("email") or "").strip()[:254],
+        "phone": (src.get("phone") or "").strip()[:40],
         "billing_address": (src.get("billing_address") or "").strip()[:500],
         "registration_no": (src.get("registration_no") or "").strip()[:60],
         "vat_number": (src.get("vat_number") or "").strip()[:60],
@@ -369,15 +510,15 @@ def client_form(client_id=None):
             with dbmod.transaction(g.db):
                 if client is None:
                     cur = g.db.execute("""INSERT INTO clients(name, email, billing_address, registration_no,
-                                          vat_number, created_at) VALUES (?,?,?,?,?,?)""",
+                                          vat_number, phone, created_at) VALUES (?,?,?,?,?,?,?)""",
                                        (values["name"], values["email"], values["billing_address"],
-                                        values["registration_no"], values["vat_number"], now))
+                                        values["registration_no"], values["vat_number"], values["phone"], now))
                     new_id = cur.lastrowid
                 else:
                     g.db.execute("""UPDATE clients SET name=?, email=?, billing_address=?, registration_no=?,
-                                    vat_number=? WHERE id=?""",
+                                    vat_number=?, phone=? WHERE id=?""",
                                  (values["name"], values["email"], values["billing_address"],
-                                  values["registration_no"], values["vat_number"], client_id))
+                                  values["registration_no"], values["vat_number"], values["phone"], client_id))
                     new_id = client_id
             flash("Client saved.", "success")
             return redirect(url_for("web.client_detail", client_id=new_id))
@@ -415,10 +556,10 @@ def api_client_quick_add():
         return _json_error("Check the highlighted fields.", 422, errors)
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
     with dbmod.transaction(g.db):
-        cur = g.db.execute("""INSERT INTO clients(name, email, billing_address, registration_no, vat_number, created_at)
-                              VALUES (?,?,?,?,?,?)""",
+        cur = g.db.execute("""INSERT INTO clients(name, email, billing_address, registration_no, vat_number, phone, created_at)
+                              VALUES (?,?,?,?,?,?,?)""",
                            (values["name"], values["email"], values["billing_address"],
-                            values["registration_no"], values["vat_number"], now))
+                            values["registration_no"], values["vat_number"], values["phone"], now))
     return jsonify({"ok": True, "client": {**values, "id": cur.lastrowid}})
 
 
@@ -501,7 +642,8 @@ def api_catalog():
 @bp.get("/templates")
 def templates_page():
     s = settings()
-    return render_template("templates.html", templates=pdfmod.TEMPLATES, s=s, opts=s["template_options"])
+    return render_template("templates.html", templates=pdfmod.TEMPLATES, categories=pdfmod.CATEGORIES,
+                           s=s, opts=s["template_options"], doc=sample_render_data(s))
 
 
 @bp.post("/templates")
@@ -524,20 +666,9 @@ def templates_save():
     return redirect(url_for("web.templates_page"))
 
 
-@bp.get("/templates/sample.pdf")
-def template_sample():
-    s = settings()
-    template = request.args.get("template", s["default_template"])
-    if template not in pdfmod.TEMPLATES:
-        abort(400)
-    accent = request.args.get("accent", "")
-    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", accent):
-        accent = ""
-    font = request.args.get("font", "Helvetica")
-    opts = {"accent": accent or s["template_options"].get("accent"), "font": font,
-            "footer": request.args.get("footer", s["template_options"].get("footer", ""))[:200],
-            "show_logo": request.args.get("show_logo", "1") == "1"}
-    data = {
+def sample_render_data(s):
+    """A realistic sample invoice used by the template gallery and the sample PDF."""
+    return {
         "number": "INV-0042", "status": "draft", "issue_date": dt.date.today().isoformat(),
         "due_date": (dt.date.today() + dt.timedelta(days=30)).isoformat(), "currency": s["currency"],
         "payment_terms": "Payment due within 30 days", "payment_instructions": s["payment_instructions"],
@@ -558,6 +689,22 @@ def template_sample():
         "totals": {"subtotal": "1335.00", "discount_total": "95.00", "vat_total": "280.35", "total": "1615.35"},
         "legal_footer": s["legal_footer"],
     }
+
+
+@bp.get("/templates/sample.pdf")
+def template_sample():
+    s = settings()
+    template = request.args.get("template", s["default_template"])
+    if template not in pdfmod.TEMPLATES:
+        abort(400)
+    accent = request.args.get("accent", "")
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", accent):
+        accent = ""
+    font = request.args.get("font", "Helvetica")
+    opts = {"accent": accent or s["template_options"].get("accent"), "font": font,
+            "footer": request.args.get("footer", s["template_options"].get("footer", ""))[:200],
+            "show_logo": request.args.get("show_logo", "1") == "1"}
+    data = sample_render_data(s)
     return _pdf_response(pdfmod.render(data, template, opts), "template-sample.pdf")
 
 

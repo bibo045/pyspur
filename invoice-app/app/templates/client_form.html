@@ -14,6 +14,8 @@
       {% if errors.get('email') %}<span id="e-email" class="text-xs text-destructive">{{ errors['email'] }}</span>{% else %}<span class="text-xs text-muted-foreground">Invoices are emailed to this address.</span>{% endif %}</label>
     <label class="space-y-1.5 sm:col-span-2"><span class="label">Billing address</span>
       <textarea class="field" name="billing_address" rows="3" maxlength="500">{{ values.get('billing_address', '') }}</textarea></label>
+    <label class="space-y-1.5"><span class="label">Phone <span class="font-normal">(WhatsApp, with country code)</span></span>
+      <input class="field" name="phone" type="tel" inputmode="tel" value="{{ values.get('phone', '') }}" maxlength="40" placeholder="+32 470 00 00 00"></label>
     <label class="space-y-1.5"><span class="label">Registration no.</span>
       <input class="field" name="registration_no" value="{{ values.get('registration_no', '') }}" maxlength="60"></label>
     <label class="space-y-1.5"><span class="label">VAT no.</span>

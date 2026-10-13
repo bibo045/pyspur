@@ -1,94 +1,131 @@
 {% extends "base.html" %}
-{% from "ui.html" import page_header, kpi, badge, btn, empty, icon %}
-{% block title %}Dashboard{% endblock %}
+{% from "ui.html" import btn, icon, illo, badge, empty %}
+{% block title %}Home{% endblock %}
 {% block content %}
-{% call page_header("Good to see you", today.strftime('%A, %d %B %Y')) %}
-  {% if has_demo %}
-  <form method="post" action="{{ url_for('web.settings_demo') }}">
-    <input type="hidden" name="action" value="clear">
-    <button class="{{ btn('ghost') }}" type="submit" data-once>Remove demo data</button>
+{# Phone: hero card, quick stats, recent cards. Tablet and desktop: the same content in a grid. #}
+<div class="flex items-start justify-between gap-4">
+  <div class="min-w-0">
+    <p class="text-sm text-muted-foreground">{{ today.strftime('%A, %d %B') }}</p>
+    <h1 class="font-display text-3xl leading-tight tracking-tight">{{ 'Hello' if not business_name else 'Hello, ' ~ business_name.split()[0] }}</h1>
+  </div>
+  <form method="post" action="{{ url_for('web.invoice_new') }}" class="hidden lg:block">
+    <button class="{{ btn('primary', 'lg') }} bg-accent text-accent-foreground hover:bg-accent/90" type="submit" data-once>{{ icon('plus') }} New invoice</button>
   </form>
-  {% endif %}
-  <form method="post" action="{{ url_for('web.invoice_new') }}">
-    <button class="{{ btn('primary', 'lg') }}" type="submit" data-once>{{ icon('plus') }} Create invoice</button>
-  </form>
-{% endcall %}
+</div>
 
 {% if not setup_ok %}
-<div class="mb-6 flex flex-col gap-3 rounded-[var(--radius-card)] border border-warning/40 bg-warning/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-  <div class="flex items-start gap-3">
-    {{ icon('info', 'h-5 w-5 mt-0.5 text-warning') }}
-    <div>
-      <p class="font-medium">Finish setup before you send your first invoice</p>
-      <p class="text-sm text-muted-foreground">
-        {% if not mail_ready %}Connect an email provider. {% endif %}Add your business details and bank account.
-      </p>
-    </div>
-  </div>
-  <a href="{{ url_for('web.settings_page') }}" class="{{ btn('secondary', 'sm') }} shrink-0">Open settings</a>
-</div>
+<a href="{{ url_for('web.settings_page') }}" class="mt-5 flex items-center gap-3 rounded-2xl bg-warning-soft p-4 transition-colors active:opacity-90">
+  {{ illo('setup', 'h-14 w-16') }}
+  <span class="min-w-0 flex-1">
+    <span class="block font-medium text-foreground">Finish setup to send invoices</span>
+    <span class="block text-sm text-foreground/80">{% if not mail_ready %}Connect email. {% endif %}Add your business details and bank account.</span>
+  </span>
+  {{ icon('chevron-right', 'h-4 w-4 text-foreground') }}
+</a>
 {% endif %}
 
-<section class="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-  {{ kpi("Invoiced this month", month_total|money ~ " " ~ currency) }}
-  {{ kpi("Outstanding", outstanding|money ~ " " ~ currency, "Unpaid, including overdue") }}
-  {{ kpi("Paid", paid|money ~ " " ~ currency, paid_count ~ " invoices") }}
-  {{ kpi("Overdue", overdue|money ~ " " ~ currency, overdue_count ~ " invoices", alert=overdue_count > 0) }}
+<form method="post" action="{{ url_for('web.invoice_new') }}" class="mt-5 lg:hidden">
+  <button class="{{ btn('primary', 'lg') }} w-full" type="submit" data-once>{{ icon('plus') }} Create invoice</button>
+</form>
+
+<section class="mt-4 grid gap-4 lg:grid-cols-3">
+  {# Hero: what is still owed. #}
+  <div class="relative overflow-hidden rounded-3xl bg-primary p-5 text-primary-foreground lg:col-span-2 lg:p-7">
+    <div class="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-primary-foreground/10" aria-hidden="true"></div>
+    <div class="absolute -bottom-12 right-16 h-28 w-28 rounded-full bg-primary-foreground/10" aria-hidden="true"></div>
+    <div class="relative flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="text-sm text-primary-foreground/80">Waiting to be paid</p>
+        <p class="num mt-1 text-3xl font-semibold tracking-tight lg:text-4xl">{{ outstanding|money }} <span class="text-lg font-medium text-primary-foreground/80">{{ currency }}</span></p>
+        <p class="mt-2 text-sm text-primary-foreground/85">{{ outstanding_count }} unpaid invoice{{ '' if outstanding_count == 1 else 's' }}{% if overdue_count %} · {{ overdue_count }} overdue{% endif %}</p>
+      </div>
+      {# Six-month sparkline of invoiced totals. Points are computed here from the server data. #}
+      {% set n = spark|length %}{% set mx = (spark|max) or 1 %}
+      <svg class="h-20 w-32 shrink-0 text-accent sm:w-40" viewBox="0 0 120 56" fill="none" aria-hidden="true">
+        <defs><linearGradient id="spark-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".35"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+        {% set ns = namespace(pts=[]) %}
+        {% for v in spark %}{% set ns.pts = ns.pts + [(loop.index0 * 120 / ((n - 1) or 1)) ~ ',' ~ (50 - v / mx * 42)] %}{% endfor %}
+        <polyline points="{{ ns.pts|join(' ') }}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <polygon points="0,56 {{ ns.pts|join(' ') }} 120,56" fill="url(#spark-fill)"/>
+      </svg>
+    </div>
+    <div class="relative mt-5 flex flex-wrap gap-2">
+      <span class="rounded-full bg-primary-foreground/12 px-3 py-1 text-xs">Drafts <b class="num font-semibold">{{ counts.draft }}</b></span>
+      <span class="rounded-full bg-primary-foreground/12 px-3 py-1 text-xs">Sent <b class="num font-semibold">{{ counts.sent }}</b></span>
+      <span class="rounded-full bg-primary-foreground/12 px-3 py-1 text-xs">Paid <b class="num font-semibold">{{ counts.paid }}</b></span>
+    </div>
+    <div class="relative mt-5 grid grid-cols-2 gap-3 border-t border-primary-foreground/15 pt-4 text-sm">
+      <div class="min-w-0"><p class="text-primary-foreground/75">Invoiced this month</p><p class="num mt-0.5 font-semibold">{{ month_total|money }} {{ currency }}</p></div>
+      <div class="min-w-0"><p class="text-primary-foreground/75">Paid</p><p class="num mt-0.5 font-semibold">{{ paid|money }} {{ currency }} <span class="font-normal text-primary-foreground/75">({{ paid_count }})</span></p></div>
+    </div>
+  </div>
+
+  {# Overdue: a full card when something is late; a single calm line when not. #}
+  {% if overdue_count %}
+  <div class="flex flex-col justify-between rounded-3xl bg-destructive-soft p-5 lg:p-6">
+    <div class="flex items-center gap-3">
+      <span class="grid h-10 w-10 place-items-center rounded-xl bg-destructive text-destructive-foreground">{{ icon('alert', 'h-5 w-5') }}</span>
+      <p class="font-medium">Overdue</p>
+    </div>
+    <div class="mt-4">
+      <p class="num text-2xl font-semibold text-destructive">{{ overdue|money }} {{ currency }}</p>
+      <p class="text-sm text-foreground/75">{{ overdue_count }} invoice{{ '' if overdue_count == 1 else 's' }} past due</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="flex items-center gap-3 rounded-2xl bg-success-soft px-4 py-3.5 text-sm lg:col-span-3 lg:order-none">
+    {{ icon('check-circle', 'h-5 w-5 text-success') }}
+    <p class="text-foreground">Nothing overdue. Every invoice is on time.</p>
+  </div>
+  {% endif %}
 </section>
 
-<div class="grid gap-6 lg:grid-cols-3">
-  <section class="card lg:col-span-2 min-w-0" aria-labelledby="recent-h">
-    <div class="flex items-center justify-between border-b border-border px-5 py-3.5">
-      <h2 id="recent-h" class="text-sm font-semibold">Recent invoices</h2>
-      <a href="{{ url_for('web.invoice_list') }}" class="text-sm text-muted-foreground hover:text-foreground">View all</a>
-    </div>
-    {% if recent %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="text-left text-xs text-muted-foreground">
-          <tr><th class="px-5 py-2.5 font-medium">Number</th><th class="px-3 py-2.5 font-medium">Client</th><th class="px-3 py-2.5 font-medium">Due</th><th class="px-3 py-2.5 text-right font-medium">Total</th><th class="px-5 py-2.5 font-medium">Status</th></tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-        {% for r in recent %}
-          <tr class="hover:bg-muted/50">
-            <td class="px-5 py-3"><a class="font-medium hover:underline" href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }}</a></td>
-            <td class="px-3 py-3 text-muted-foreground">{{ r['client_name'] }}</td>
-            <td class="px-3 py-3 whitespace-nowrap">{{ r['due_date']|date }}</td>
-            <td class="num px-3 py-3">{{ r['total']|money }}</td>
-            <td class="px-5 py-3">{{ badge(effective(r)) }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-      {% call empty("No invoices yet", "Create your first invoice. A returning client takes about 30 seconds.") %}
-        <form method="post" action="{{ url_for('web.invoice_new') }}">
-          <button class="{{ btn('primary') }}" type="submit" data-once>Create your first invoice</button>
-        </form>
-      {% endcall %}
-    {% endif %}
-  </section>
+{% if overdue_rows %}
+<section class="mt-8" aria-labelledby="attn-h">
+  <h2 id="attn-h" class="mb-3 text-sm font-semibold">Needs attention</h2>
+  <ul class="space-y-2.5">
+    {% for r in overdue_rows %}
+    <li>
+      <a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}" class="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition-colors active:bg-muted">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-destructive-soft text-destructive">{{ icon('clock', 'h-5 w-5') }}</span>
+        <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ r['client_name'] }}</span><span class="block text-xs text-destructive">Due {{ r['due_date']|date }} · {{ r['number'] }}</span></span>
+        <span class="num text-sm font-semibold">{{ r['total']|money }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
 
-  <section class="card min-w-0 self-start" aria-labelledby="attn-h">
-    <div class="border-b border-border px-5 py-3.5">
-      <h2 id="attn-h" class="text-sm font-semibold">Needs attention</h2>
+<section class="mt-8" aria-labelledby="recent-h">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 id="recent-h" class="text-sm font-semibold">Recent invoices</h2>
+    <a href="{{ url_for('web.invoice_list') }}" class="text-sm font-medium text-primary hover:underline">See all</a>
+  </div>
+  {% if recent %}
+    <ul class="overflow-hidden rounded-2xl border border-border bg-surface divide-y divide-border">
+    {% for r in recent %}
+      <li>
+        <a href="{{ url_for('web.invoice_detail', invoice_id=r['id']) if r['status'] != 'draft' else url_for('web.invoice_edit', invoice_id=r['id']) }}" class="flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-muted hover:bg-muted/50">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl {{ 'bg-success-soft text-success' if effective(r) == 'paid' else 'bg-destructive-soft text-destructive' if effective(r) == 'overdue' else 'bg-info-soft text-info' if effective(r) in ('sent','finalized') else 'bg-muted text-muted-foreground' }}">{{ icon('file', 'h-4.5 w-4.5') }}</span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-sm font-medium">{{ r['client_name'] or 'No client' }}</span>
+            <span class="block text-xs text-muted-foreground">{{ r['number'] or 'Draft' }} · due {{ r['due_date']|date }}</span>
+          </span>
+          <span class="flex flex-col items-end gap-1">
+            <span class="num text-sm font-semibold">{{ r['total']|money }}</span>
+            {{ badge(effective(r)) }}
+          </span>
+        </a>
+      </li>
+    {% endfor %}
+    </ul>
+  {% else %}
+    <div class="rounded-2xl border border-dashed border-border-strong bg-surface">
+      {% call empty("Your first invoice starts here", "Pick a client, add a service, and send it. A returning client takes about 30 seconds.") %}
+        <form method="post" action="{{ url_for('web.invoice_new') }}"><button class="{{ btn('primary') }} bg-accent text-accent-foreground hover:bg-accent/90" type="submit" data-once>Create invoice</button></form>
+      {% endcall %}
     </div>
-    {% if overdue_rows %}
-      <ul class="divide-y divide-border">
-      {% for r in overdue_rows %}
-        <li class="flex items-center justify-between gap-3 px-5 py-3">
-          <div class="min-w-0">
-            <a class="block truncate text-sm font-medium hover:underline" href="{{ url_for('web.invoice_detail', invoice_id=r['id']) }}">{{ r['number'] }} · {{ r['client_name'] }}</a>
-            <span class="text-xs text-destructive">Due {{ r['due_date']|date }}</span>
-          </div>
-          <span class="num shrink-0 text-sm">{{ r['total']|money }}</span>
-        </li>
-      {% endfor %}
-      </ul>
-    {% else %}
-      {% call empty("Nothing overdue", "Invoices past their due date show up here.") %}{% endcall %}
-    {% endif %}
-  </section>
-</div>
+  {% endif %}
+</section>
 {% endblock %}

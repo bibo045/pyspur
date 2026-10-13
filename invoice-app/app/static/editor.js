@@ -308,6 +308,9 @@
     if (!state.client_id) { showStep(0); showError("Choose a client before finalizing."); return; }
     if (!state.items.length) { showStep(1); showError("Add at least one line before finalizing."); return; }
     $("#finalize-recipient").textContent = $("#client-card-email").textContent || "the client";
+    $("#finalize-copy").textContent = data.mailReady
+      ? "The invoice gets its next number, a PDF copy is saved and emailed. After that it cannot be edited."
+      : "The invoice gets its next number and is saved. Email isn't connected, so you'll share it from the send screen. After that it cannot be edited.";
     finalizeDialog.showModal();
     $("#finalize-confirm").focus();
   });
@@ -326,7 +329,8 @@
     try {
       const res = await fetch(`/api/invoices/${id}/finalize-send`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payload: payload(), subject: $("#email_subject").value, body: $("#email_body").value }),
+        body: JSON.stringify({ payload: payload(), subject: $("#email_subject").value, body: $("#email_body").value,
+          send: data.mailReady }),
       });
       const json = await res.json().catch(() => ({ ok: false, error: "Unexpected response from the server." }));
       if (json.ok || json.status === "finalized" || json.status === "sent") {

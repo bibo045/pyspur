@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Invoices{% endblock %} · {{ business_name or 'Invoicing' }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1F2A44">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Invo">
+  <title>{% block title %}Invoices{% endblock %} · {{ business_name or 'Invo' }}</title>
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif&display=swap">
@@ -12,48 +20,63 @@
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
 <body class="min-h-dvh">
-{% from "ui.html" import icon, nav_icon %}
+{% from "ui.html" import icon, tab %}
 <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-surface focus:px-3 focus:py-2 focus:shadow-[var(--shadow-pop)]">Skip to content</a>
 
 <div class="flex min-h-dvh">
-  <!-- Sidebar (desktop) -->
-  <aside class="hidden w-60 shrink-0 flex-col border-r border-border bg-background px-3 py-5 lg:flex" aria-label="Main">
+  <!-- Sidebar: tablet and desktop only -->
+  <aside class="hidden w-60 shrink-0 flex-col border-r border-border bg-surface px-3 py-5 lg:flex" aria-label="Main">
     {% include "partials/nav.html" %}
   </aside>
 
-  <!-- Mobile navigation drawer -->
-  <div id="mobile-nav" class="fixed inset-0 z-50 lg:hidden" hidden>
-    <div class="absolute inset-0 bg-foreground/30" data-close-nav></div>
-    <aside class="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-background px-3 py-5 shadow-[var(--shadow-pop)]" role="dialog" aria-modal="true" aria-label="Navigation">
-      <div class="mb-2 flex justify-end"><button class="rounded-md p-2 hover:bg-muted" data-close-nav aria-label="Close navigation">{{ icon('x') }}</button></div>
-      {% include "partials/nav.html" %}
-    </aside>
-  </div>
-
   <div class="flex min-w-0 flex-1 flex-col">
-    <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur sm:px-6">
-      <button class="rounded-md p-2 hover:bg-muted lg:hidden" data-open-nav aria-label="Open navigation" aria-controls="mobile-nav">{{ icon('menu') }}</button>
-      <div class="min-w-0 flex-1 truncate text-sm text-muted-foreground">{% block crumbs %}{% endblock %}</div>
-      <a href="{{ url_for('web.settings_page') }}" class="hidden items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground sm:flex">
-        <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">{{ (business_name or 'I')[:1]|upper }}</span>
-        <span class="max-w-[12rem] truncate">{{ business_name or 'Set up your business' }}</span>
+    <header class="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur"
+            style="padding-top: env(safe-area-inset-top, 0px); height: calc(3.5rem + env(safe-area-inset-top, 0px));">
+      <a href="{{ url_for('web.dashboard') }}" class="flex items-center gap-2 lg:hidden" aria-label="Invo home">
+        <span class="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground">{{ icon('logo', 'h-4 w-4') }}</span>
+        <span class="font-display text-xl leading-none">Invo</span>
+      </a>
+      <div class="hidden min-w-0 flex-1 truncate text-sm text-muted-foreground lg:block">{% block crumbs %}{% endblock %}</div>
+      <a href="{{ url_for('web.settings_page') }}" class="ml-auto flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+        <span class="grid h-7 w-7 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">{{ (business_name or 'L')[:1]|upper }}</span>
+        <span class="hidden max-w-[12rem] truncate sm:inline">{{ business_name or 'Set up your business' }}</span>
       </a>
     </header>
 
-    <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8" tabindex="-1">
+    <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 sm:px-6 sm:py-8 lg:pb-12 lg:pt-8" tabindex="-1">
       {% block content %}{% endblock %}
     </main>
   </div>
 </div>
 
+{% block tabbar %}
+<!-- Bottom tab bar: phones only -->
+<nav class="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur lg:hidden" aria-label="Main" style="padding-bottom: env(safe-area-inset-bottom, 0px);">
+  <div class="mx-auto grid max-w-md grid-cols-5 items-end px-2">
+    {{ tab('web.dashboard', 'Home', 'home', ['web.dashboard']) }}
+    {{ tab('web.invoice_list', 'Invoices', 'file', ['web.invoice_list', 'web.invoice_detail']) }}
+    <div class="flex justify-center">
+      <form method="post" action="{{ url_for('web.invoice_new') }}" class="-mt-5">
+        <button type="submit" data-once aria-label="Create invoice"
+          class="grid h-14 w-14 place-items-center rounded-full bg-accent text-accent-foreground shadow-[var(--shadow-fab)] transition-transform active:scale-95">
+          {{ icon('plus', 'h-6 w-6') }}
+        </button>
+      </form>
+    </div>
+    {{ tab('web.clients', 'Clients', 'users', ['web.clients', 'web.client_form', 'web.client_detail']) }}
+    {{ tab('web.more', 'More', 'more', ['web.more', 'web.services', 'web.service_form', 'web.templates_page', 'web.settings_page']) }}
+  </div>
+</nav>
+{% endblock %}
+
 <!-- Toasts from flash messages -->
-<div id="toasts" class="pointer-events-none fixed bottom-4 right-4 left-4 z-[70] flex flex-col items-end gap-2 sm:left-auto" aria-live="polite" aria-atomic="false">
+<div id="toasts" class="pointer-events-none fixed inset-x-4 bottom-24 z-[70] flex flex-col items-center gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4 sm:items-end lg:bottom-4" aria-live="polite" aria-atomic="false">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for cat, msg in messages %}
-      <div class="toast pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--radius-card)] border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-pop)]" data-toast role="status">
-        <span class="mt-0.5 shrink-0 {{ 'text-success' if cat == 'success' else 'text-destructive' if cat == 'error' else 'text-info' }}">{{ icon('check' if cat == 'success' else 'alert' if cat == 'error' else 'info') }}</span>
+      <div class="toast pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm shadow-[var(--shadow-pop)]" data-toast role="status">
+        <span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full {{ 'bg-success-soft text-success' if cat == 'success' else 'bg-destructive-soft text-destructive' if cat == 'error' else 'bg-info-soft text-info' }}">{{ icon('check' if cat == 'success' else 'alert' if cat == 'error' else 'info', 'h-3.5 w-3.5') }}</span>
         <p class="min-w-0 flex-1 text-foreground">{{ msg }}</p>
-        <button class="rounded p-0.5 text-muted-foreground hover:text-foreground" data-dismiss-toast aria-label="Dismiss">{{ icon('x') }}</button>
+        <button class="rounded p-0.5 text-muted-foreground hover:text-foreground" data-dismiss-toast aria-label="Dismiss">{{ icon('x', 'h-4 w-4') }}</button>
       </div>
     {% endfor %}
   {% endwith %}

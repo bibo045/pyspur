@@ -1,67 +1,107 @@
 {% extends "base.html" %}
 {% from "ui.html" import page_header, btn, icon %}
+{% from "doc.html" import sheet %}
 {% block title %}Templates{% endblock %}
+{% block crumbs %}<span class="text-foreground">Templates</span>{% endblock %}
 {% block content %}
-{% call page_header("Templates", "Pick the default look for new invoices. You can still change it per invoice.") %}{% endcall %}
-<form method="post" id="tpl-form" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]" data-once>
-  <div class="card space-y-6 p-5 self-start">
-    <fieldset class="space-y-3">
-      <legend class="mb-3 text-sm font-semibold">Default style</legend>
-      <div class="grid gap-2.5 sm:grid-cols-2">
-        {% for key, t in templates.items() %}
-        <label class="relative cursor-pointer rounded-[var(--radius-card)] border border-border-strong p-3.5 transition-colors hover:border-foreground/40 has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary">
-          <input type="radio" name="default_template" value="{{ key }}" class="peer sr-only" {{ 'checked' if s['default_template'] == key }} data-opt>
-          <span class="flex items-center justify-between gap-2 text-sm font-medium">{{ t['label'] }}
-            <span class="grid h-4 w-4 place-items-center rounded-full border border-border-strong peer-checked:border-primary peer-checked:bg-primary"></span></span>
-          <span class="mt-1 block text-xs text-muted-foreground">{{ t['desc'] }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    </fieldset>
-    <div class="space-y-4 border-t border-border pt-5">
-      <h2 class="text-sm font-semibold">Brand</h2>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <label class="space-y-1.5"><span class="label">Accent colour</span>
-          <input type="color" name="accent" value="{{ opts.get('accent', '#1F4E79') }}" class="h-9 w-full cursor-pointer rounded-[var(--radius-control)] border border-border-strong bg-surface p-1" data-opt></label>
-        <label class="space-y-1.5"><span class="label">Typeface</span>
-          <select class="field" name="font" data-opt>
-            {% for f in ['Helvetica', 'Times-Roman', 'Courier'] %}<option {{ 'selected' if opts.get('font') == f }}>{{ f }}</option>{% endfor %}
-          </select></label>
-      </div>
-      <label class="flex items-center gap-2.5 text-sm"><input type="checkbox" class="h-4 w-4 accent-primary" name="show_logo" value="1" {{ 'checked' if opts.get('show_logo', True) }} data-opt> Show business logo</label>
-      <label class="space-y-1.5 block"><span class="label">Footer text</span>
-        <input class="field" name="footer" maxlength="200" value="{{ opts.get('footer', '') }}" placeholder="e.g. Registered in Brussels, company no. 0123.456.789" data-opt></label>
-      <p class="text-xs text-muted-foreground">The logo is uploaded in <a class="underline" href="{{ url_for('web.settings_page') }}#business">Settings</a>. Elegant and Black &amp; white keep their own typography.</p>
+<header class="mb-5">
+  <h1 class="font-display text-3xl tracking-tight">Templates</h1>
+  <p class="mt-1 text-sm text-muted-foreground">Choose the look for new invoices. Changes below update the previews as you make them.</p>
+</header>
+
+<form method="post" id="tpl-form" class="space-y-6" data-once>
+  <!-- Category filter -->
+  <div class="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="group" aria-label="Filter by category">
+    {% for cat in ['All'] + categories %}
+    <button type="button" data-cat="{{ cat }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"
+      class="shrink-0 rounded-full border border-border bg-surface px-4 py-1.5 text-sm text-muted-foreground transition-colors aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground">{{ cat }}</button>
+    {% endfor %}
+  </div>
+
+  <!-- Gallery -->
+  <div class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4" id="gallery">
+    {% for key, t in templates.items() %}
+    <label class="tpl-card group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border bg-surface transition-[border-color,box-shadow] duration-200 hover:border-border-strong has-[:checked]:border-primary has-[:checked]:ring-2 has-[:checked]:ring-primary/25" data-category="{{ t.category }}">
+      <input type="radio" name="default_template" value="{{ key }}" class="peer sr-only" {{ 'checked' if s['default_template'] == key }} data-opt>
+      <span class="relative block h-64 overflow-hidden bg-doc-canvas p-3" data-fit>
+        <span class="gallery-sheet block">
+          {{ sheet(doc, key, opts.get('accent') or t.accent_default if key != 'bw' else '#000000', t) }}
+        </span>
+        <span class="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full bg-surface text-primary opacity-0 shadow-sm transition-opacity peer-checked:opacity-100">{{ icon('check', 'h-3.5 w-3.5') }}</span>
+      </span>
+      <span class="flex flex-1 flex-col gap-0.5 p-3.5">
+        <span class="flex items-center justify-between gap-2"><span class="font-medium">{{ t.label }}</span>
+          <span class="text-[11px] text-muted-foreground">{{ t.category }}</span></span>
+        <span class="text-xs leading-snug text-muted-foreground">{{ t.desc }}</span>
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <!-- Brand controls: live -->
+  <section class="card space-y-5 p-5">
+    <h2 class="text-sm font-semibold">Brand</h2>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <label class="space-y-1.5"><span class="label">Accent colour</span>
+        <span class="flex h-10 items-center gap-2 rounded-xl border border-border-strong bg-surface px-2">
+          <input type="color" name="accent" id="accent" value="{{ opts.get('accent', '#1C2B4A') }}" class="h-7 w-10 cursor-pointer rounded-md border-0 bg-transparent p-0" data-opt>
+          <span class="num text-sm text-muted-foreground" id="accent-hex">{{ opts.get('accent', '#1C2B4A') }}</span>
+        </span></label>
+      <label class="space-y-1.5"><span class="label">Typeface in PDF</span>
+        <select class="field" name="font" data-opt>
+          {% for f in ['Helvetica', 'Times-Roman', 'Courier'] %}<option {{ 'selected' if opts.get('font') == f }}>{{ f }}</option>{% endfor %}
+        </select></label>
+      <label class="space-y-1.5"><span class="label">Footer text</span>
+        <input class="field" name="footer" id="footer" maxlength="200" value="{{ opts.get('footer', '') }}" placeholder="e.g. Registered in Brussels" data-opt></label>
     </div>
-    <div class="flex justify-end border-t border-border pt-5">
+    <label class="flex items-center gap-2.5 text-sm"><input type="checkbox" class="h-4 w-4 accent-primary" name="show_logo" value="1" {{ 'checked' if opts.get('show_logo', True) }} data-opt> Show business logo</label>
+    <div class="flex items-center justify-between gap-3 border-t border-border pt-4">
+      <p class="text-xs text-muted-foreground">Logo and bank details come from <a class="underline" href="{{ url_for('web.settings_page') }}#business">Settings</a>.</p>
       <button class="{{ btn('primary') }}" type="submit">Save as default</button>
     </div>
-  </div>
-  <div class="card overflow-hidden self-start lg:sticky lg:top-20">
-    <div class="flex items-center justify-between border-b border-border px-4 py-3"><span class="text-sm font-medium">Preview</span><span class="text-xs text-muted-foreground">Sample invoice</span></div>
-    <iframe id="tpl-preview" class="block h-[70dvh] min-h-[480px] w-full bg-muted" title="Template preview" src="{{ url_for('web.template_sample', template=s['default_template']) }}"></iframe>
-  </div>
+  </section>
 </form>
 {% endblock %}
 {% block scripts %}
 <script>
 (function () {
-  const frame = document.getElementById("tpl-preview");
   const form = document.getElementById("tpl-form");
-  let timer;
-  function refresh() {
-    const p = new URLSearchParams();
-    const tpl = form.querySelector("input[name=default_template]:checked");
-    if (tpl) p.set("template", tpl.value);
-    form.querySelectorAll("[data-opt]").forEach(el => {
-      if (el.type === "checkbox") p.set(el.name, el.checked ? "1" : "0");
-      else if (el.type === "radio") return;
-      else p.set(el.name, el.value);
+  const gallery = document.getElementById("gallery");
+  const accent = document.getElementById("accent");
+  const hex = document.getElementById("accent-hex");
+
+  // Live: accent colour and footer apply to every preview at once, without a round trip.
+  function applyAccent() {
+    hex.textContent = accent.value.toUpperCase();
+    gallery.querySelectorAll(".doc").forEach(d => {
+      const isBw = d.classList.contains("doc-bw");
+      d.style.setProperty("--doc-accent", isBw ? "#000000" : accent.value);
     });
-    frame.src = "{{ url_for('web.template_sample') }}?" + p.toString();
   }
-  form.addEventListener("change", () => { clearTimeout(timer); timer = setTimeout(refresh, 200); });
-  form.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(refresh, 350); });
+  accent.addEventListener("input", applyAccent);
+
+  // Scale each 360px sheet to fit its card, and keep it in step with resizes.
+  function fitSheets() {
+    gallery.querySelectorAll("[data-fit]").forEach(box => {
+      const sheetEl = box.querySelector(".gallery-sheet");
+      const scale = (box.clientWidth - 24) / 360;
+      sheetEl.style.transform = `scale(${scale})`;
+      sheetEl.style.height = `${sheetEl.scrollHeight * scale}px`;
+    });
+  }
+  window.addEventListener("resize", fitSheets);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSheets);
+  fitSheets();
+
+  // Categories filter the gallery without leaving the page.
+  document.querySelectorAll("[data-cat]").forEach(btn => btn.addEventListener("click", () => {
+    const cat = btn.dataset.cat;
+    document.querySelectorAll("[data-cat]").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+    gallery.querySelectorAll("[data-category]").forEach(card => {
+      card.hidden = cat !== "All" && card.dataset.category !== cat;
+    });
+  }));
+  applyAccent();
 })();
 </script>
 {% endblock %}

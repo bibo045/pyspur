@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "ui.html" import btn, icon, illo %}
+{% block title %}Send {{ inv['number'] }}{% endblock %}
+{% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.invoice_detail', invoice_id=inv['id']) }}">{{ inv['number'] }}</a> <span class="mx-1">/</span> <span class="text-foreground">Send</span>{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<div class="mb-5 flex items-center gap-3">
+  <a href="{{ url_for('web.invoice_review', invoice_id=inv['id']) }}" class="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Back to preview">{{ icon('arrow-left', 'h-4 w-4') }}</a>
+  <h1 class="font-display text-2xl leading-tight">Send invoice</h1>
+</div>
+
+<div class="mx-auto max-w-xl space-y-5">
+  <div class="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4">
+    <span class="grid h-11 w-11 place-items-center rounded-full bg-primary-soft text-sm font-semibold text-primary">{{ (inv['client_name'] or '?')[:1]|upper }}</span>
+    <div class="min-w-0 flex-1"><p class="truncate font-medium">{{ inv['client_name'] }}</p><p class="num text-sm text-muted-foreground">{{ inv['number'] }} · {{ inv['total']|money }} {{ inv['currency'] }}</p></div>
+  </div>
+
+  <section class="space-y-3" aria-labelledby="ch-h">
+    <h2 id="ch-h" class="text-sm font-semibold">How do you want to send it?</h2>
+
+    <!-- Email with PDF -->
+    <form method="post" action="{{ url_for('web.invoice_send_email', invoice_id=inv['id']) }}" class="rounded-2xl border border-primary bg-surface p-4 ring-1 ring-primary/30 space-y-4" data-once>
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3"><span class="grid h-10 w-10 place-items-center rounded-xl bg-info-soft text-info">{{ icon('mail', 'h-5 w-5') }}</span>
+          <div><p class="font-medium">Email with PDF</p><p class="text-xs text-muted-foreground">To {{ inv['client_email'] }}</p></div></div>
+        <span class="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">Recommended</span>
+      </div>
+      {% if not mail_ready %}
+        <p class="rounded-xl bg-warning-soft p-3 text-sm">Email isn't connected yet. <a class="font-medium underline" href="{{ url_for('web.settings_page') }}#email">Connect email</a> to send from the app.</p>
+      {% endif %}
+      <label class="block space-y-1.5"><span class="label">Subject</span><input class="field" name="subject" value="{{ subject }}" maxlength="300"></label>
+      <label class="block space-y-1.5"><span class="label">Message</span><textarea class="field min-h-32" name="body" rows="6" maxlength="4000">{{ body }}</textarea></label>
+      <button class="{{ btn('primary', 'lg') }} w-full" type="submit" {{ 'disabled' if not mail_ready }}>{{ icon('send') }} Send invoice</button>
+      <p class="text-xs text-muted-foreground">The invoice is marked as sent only when your email provider accepts it.</p>
+    </form>
+
+    <!-- WhatsApp share -->
+    <form method="post" action="{{ url_for('web.invoice_send_whatsapp', invoice_id=inv['id']) }}" class="rounded-2xl border border-border bg-surface p-4 space-y-3" data-once>
+      <div class="flex items-center gap-3">
+        <span class="grid h-10 w-10 place-items-center rounded-xl bg-success-soft text-success">{{ icon('send', 'h-5 w-5') }}</span>
+        <div class="min-w-0"><p class="font-medium">WhatsApp</p>
+          <p class="text-xs text-muted-foreground">{{ 'Opens WhatsApp with a link to the PDF.' if has_phone else 'Add the client’s phone number first.' }}</p></div>
+      </div>
+      {% if not public_base %}
+        <p class="text-xs text-muted-foreground">Set PUBLIC_BASE_URL on the server so the link works on the client’s phone.</p>
+      {% endif %}
+      <button class="{{ btn('secondary', 'lg') }} w-full" type="submit" {{ 'disabled' if not has_phone }}>Share on WhatsApp</button>
+      {% if not has_phone %}<a class="block text-center text-sm underline" href="{{ url_for('web.client_form', client_id=inv['client_id']) }}">Add phone number</a>{% endif %}
+    </form>
+  </section>
+</div>
+{% endblock %}

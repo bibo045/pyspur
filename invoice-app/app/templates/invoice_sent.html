@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "ui.html" import btn, icon, illo, badge %}
+{% block title %}Sent {{ inv['number'] }}{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<div class="mx-auto flex max-w-md flex-col items-center pt-6 text-center" role="status">
+  {{ illo('success', 'h-44 w-56') }}
+  <h1 class="mt-4 font-display text-4xl tracking-tight">{{ 'Invoice sent!' if via == 'email' else 'Shared!' }}</h1>
+  <p class="mt-2 max-w-xs text-sm text-muted-foreground">
+    {% if via == 'email' %}{{ inv['number'] }} was accepted by your email provider and sent to {{ to or inv['client_name'] }}.{% else %}The WhatsApp chat is open with a link to {{ inv['number'] }}.{% endif %}
+  </p>
+
+  <div class="mt-7 w-full rounded-2xl border border-border bg-surface p-4 text-left">
+    <div class="flex items-center justify-between gap-3">
+      <div class="min-w-0"><p class="truncate font-medium">{{ inv['client_name'] }}</p><p class="num text-sm text-muted-foreground">{{ inv['number'] }} · due {{ inv['due_date']|date }}</p></div>
+      <div class="text-right"><p class="num font-semibold">{{ inv['total']|money }}</p>{{ badge('sent') }}</div>
+    </div>
+  </div>
+
+  <div class="mt-6 grid w-full gap-2.5">
+    <a class="{{ btn('primary', 'lg') }}" href="{{ url_for('web.invoice_detail', invoice_id=inv['id']) }}">View invoice</a>
+    <a class="{{ btn('secondary', 'lg') }}" href="{{ url_for('web.invoice_new') }}">Create another</a>
+  </div>
+  <a class="mt-4 text-sm text-muted-foreground underline" href="{{ url_for('web.dashboard') }}">Back to home</a>
+</div>
+{% endblock %}

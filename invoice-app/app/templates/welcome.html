@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "ui.html" import btn, icon, illo %}
+{% block title %}Welcome{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block content %}
+<div class="mx-auto flex min-h-[calc(100dvh-8rem)] max-w-md flex-col">
+  <div class="relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-[32px] bg-primary px-6 py-12 text-center text-primary-foreground">
+    <div class="absolute -left-16 top-10 h-48 w-48 rounded-full bg-accent/30 blur-2xl" aria-hidden="true"></div>
+    <div class="absolute -right-12 bottom-6 h-40 w-40 rounded-full bg-primary-foreground/10" aria-hidden="true"></div>
+    <div class="relative">{{ illo('wallet', 'h-40 w-52') }}</div>
+    <p class="relative mt-8 font-display text-5xl tracking-tight">Invo</p>
+    <p class="relative mt-4 font-display text-2xl leading-snug">Create, send and get paid in seconds.</p>
+    <p class="relative mt-3 max-w-xs text-sm text-primary-foreground/80">Beautiful invoices for small businesses. Saved clients and services make repeat invoices take half a minute.</p>
+  </div>
+  <div class="mt-6 space-y-3">
+    <a href="{{ url_for('web.settings_page') }}#business" class="{{ btn('primary', 'lg') }} w-full">Get started</a>
+    <a href="{{ url_for('web.dashboard') }}" class="{{ btn('ghost', 'lg') }} w-full">I already have an account</a>
+  </div>
+  <ul class="mt-8 grid grid-cols-3 gap-3 text-center text-xs text-muted-foreground">
+    <li class="rounded-2xl border border-border bg-surface p-3"><span class="mb-1 block font-medium text-foreground">Templates</span>Modern, Minimal, Classic, Bold</li>
+    <li class="rounded-2xl border border-border bg-surface p-3"><span class="mb-1 block font-medium text-foreground">Fast</span>Saved clients and services</li>
+    <li class="rounded-2xl border border-border bg-surface p-3"><span class="mb-1 block font-medium text-foreground">Get paid</span>Email or WhatsApp</li>
+  </ul>
+</div>
+{% endblock %}

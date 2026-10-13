@@ -190,6 +190,11 @@
     $$("button[aria-busy]").forEach(b => { b.disabled = false; b.removeAttribute("aria-busy"); });
   });
 
+  /* ---------- offline-ready shell: register the service worker when supported ---------- */
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("/sw.js").catch(() => { /* optional: the app works without it */ });
+  }
+
   /* ---------- entrance motion for page content ---------- */
   const main = document.getElementById("main");
   if (main && !reduce && M && M.animate) {

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "ui.html" import page_header, icon, illo %}
+{% block title %}More{% endblock %}
+{% block content %}
+<h1 class="font-display text-3xl tracking-tight">More</h1>
+<ul class="mt-5 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+  {% for endpoint, label, sub, icon_name, tone in [
+      ('web.services', 'Services & pricing', 'Things you sell and their prices', 'tag', 'bg-amber/30 text-foreground'),
+      ('web.templates_page', 'Templates', 'Look and brand of your invoices', 'layout', 'bg-violet-soft text-violet'),
+      ('web.settings_page', 'Business settings', 'Details, bank account and email', 'settings', 'bg-primary-soft text-primary')] %}
+  <li>
+    <a href="{{ url_for(endpoint) }}" class="flex items-center gap-4 px-4 py-4 transition-colors active:bg-muted hover:bg-muted/60">
+      <span class="grid h-11 w-11 place-items-center rounded-xl {{ tone }}">{{ icon(icon_name, 'h-5 w-5') }}</span>
+      <span class="min-w-0 flex-1"><span class="block font-medium">{{ label }}</span><span class="block text-sm text-muted-foreground">{{ sub }}</span></span>
+      <span class="text-muted-foreground">{{ icon('chevron-right', 'h-4 w-4') }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+<div class="mt-8 flex items-center gap-4 rounded-2xl bg-accent-soft p-4">
+  {{ illo('mail', 'h-16 w-20') }}
+  <div class="min-w-0">
+    <p class="font-medium">Send invoices from your own email</p>
+    <p class="text-sm text-muted-foreground">{{ 'Your email is connected.' if mail_ready else 'Connect an email provider in Settings to start sending.' }}</p>
+  </div>
+</div>
+{% endblock %}

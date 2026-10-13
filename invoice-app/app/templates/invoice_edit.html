@@ -2,6 +2,7 @@
 {% from "ui.html" import btn, icon, confirm_dialog %}
 {% block title %}Draft invoice{% endblock %}
 {% block crumbs %}<a class="hover:text-foreground" href="{{ url_for('web.invoice_list') }}">Invoices</a> <span class="mx-1">/</span> <span class="text-foreground">Draft</span>{% endblock %}
+{% block tabbar %}{% endblock %}
 {% block content %}
 <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
   <div>
@@ -138,11 +139,12 @@
       <label class="space-y-1.5"><span class="label">Email message</span><textarea class="field min-h-40" id="email_body" rows="8" maxlength="4000">{{ body }}</textarea></label>
       <p class="text-xs text-muted-foreground">Use {client_name}, {number}, {total}, {due_date} or {business_name}. They are filled in when the email is sent.</p>
       {% if not mail_ready %}
-      <div class="rounded-[var(--radius-card)] border border-warning/40 bg-warning/5 p-3.5 text-sm">Email is not connected, so finalizing is blocked. <a class="underline" href="{{ url_for('web.settings_page') }}#email">Connect email</a>.</div>
+      <div class="rounded-[var(--radius-card)] border border-warning/40 bg-warning/5 p-3.5 text-sm">Email isn't connected yet. You can still finalize and share on WhatsApp, or <a class="underline" href="{{ url_for('web.settings_page') }}#email">connect email</a>.</div>
       {% endif %}
       <div class="flex flex-wrap items-center gap-2">
-        <button id="finalize-send" type="button" class="{{ btn('primary', 'lg') }}" {{ 'disabled' if not mail_ready }}>{{ icon('send') }} Finalize &amp; send</button>
+        <button id="finalize-send" type="button" class="{{ btn('primary', 'lg') }}">{{ icon('send') }} {{ 'Finalize & send' if mail_ready else 'Finalize' }}</button>
         <button id="save-draft-2" type="button" class="{{ btn('secondary', 'lg') }}">Save draft</button>
+        <a class="{{ btn('ghost', 'lg') }}" href="{{ url_for('web.invoice_review', invoice_id=inv['id']) }}">{{ icon('eye') }} Preview</a>
       </div>
       <p class="text-xs text-muted-foreground">Finalizing assigns the next invoice number, stores the PDF and emails it. After that the invoice is locked.</p>
     </section>
@@ -178,7 +180,7 @@
   <div class="flex flex-col gap-4 p-5">
     <div class="space-y-1.5">
       <h2 id="finalize-title" class="text-base font-semibold">Finalize and send?</h2>
-      <p class="text-sm text-muted-foreground">The invoice gets its next number, a PDF copy is saved and emailed to <span id="finalize-recipient" class="text-foreground"></span>. After that it cannot be edited.</p>
+      <p class="text-sm text-muted-foreground"><span id="finalize-copy"></span> <span class="text-foreground" id="finalize-recipient"></span></p>
     </div>
     <div class="flex justify-end gap-2">
       <button type="button" class="{{ btn('secondary') }}" data-dialog-close>Keep editing</button>

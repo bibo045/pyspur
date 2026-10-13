@@ -78,6 +78,13 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     line_vat    TEXT NOT NULL,
     line_total  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS activity (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id  INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    kind        TEXT NOT NULL,       -- finalized | email_sent | email_failed | whatsapp_shared | paid | reopened | cancelled
+    detail      TEXT NOT NULL DEFAULT '',
+    at          TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS email_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id  INTEGER NOT NULL REFERENCES invoices(id),
@@ -148,9 +155,24 @@ def transaction(conn, immediate=True):
         raise
 
 
+# Columns added after the first release. Each is added only when missing, so existing databases upgrade in place.
+MIGRATIONS = [
+    ("clients", "phone", "TEXT NOT NULL DEFAULT ''"),
+    ("invoices", "share_token", "TEXT"),
+]
+
+
+def migrate(conn):
+    for table, column, decl in MIGRATIONS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def init_db(conn=None):
     conn = conn or connect()
     conn.executescript(SCHEMA)
+    migrate(conn)
     with transaction(conn):
         for key, value in DEFAULT_SETTINGS.items():
             conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (key, value))

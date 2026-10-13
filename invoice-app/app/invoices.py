@@ -28,6 +28,38 @@ def today():
     return dt.date.today()
 
 
+def _now():
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def log_activity(conn, invoice_id, kind, detail=""):
+    conn.execute("INSERT INTO activity(invoice_id, kind, detail, at) VALUES (?,?,?,?)",
+                 (invoice_id, kind, detail[:300], _now()))
+
+
+def ensure_share_token(conn, invoice_id):
+    """Random, unguessable token for the public PDF link. Created once per invoice."""
+    row = conn.execute("SELECT share_token, status FROM invoices WHERE id=?", (invoice_id,)).fetchone()
+    if row is None:
+        raise BusinessError("Invoice not found.")
+    if row["status"] == "draft":
+        raise BusinessError("Finalize the invoice before sharing it.")
+    if row["share_token"]:
+        return row["share_token"]
+    token = uuid.uuid4().hex + uuid.uuid4().hex[:8]
+    with dbmod.transaction(conn):
+        conn.execute("UPDATE invoices SET share_token=? WHERE id=? AND share_token IS NULL", (token, invoice_id))
+    return conn.execute("SELECT share_token FROM invoices WHERE id=?", (invoice_id,)).fetchone()[0]
+
+
+def whatsapp_link(phone, message):
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if not digits:
+        raise BusinessError("Add the client's phone number (with country code) to share on WhatsApp.")
+    from urllib.parse import quote
+    return f"https://wa.me/{digits}?text={quote(message)}"
+
+
 def parse_date(value, field):
     try:
         return dt.date.fromisoformat(str(value))
@@ -295,6 +327,7 @@ def finalize(conn, invoice_id, settings):
             fh.write(pdf_bytes)
         os.replace(tmp, path)
         conn.execute("UPDATE invoices SET pdf_path=? WHERE id=?", (path, invoice_id))
+        log_activity(conn, invoice_id, "finalized", number)
     return number
 
 
@@ -364,6 +397,8 @@ def send(conn, invoice_id, settings, subject=None, body=None):
             if not error:
                 conn.execute("UPDATE invoices SET status='sent', updated_at=? WHERE id=? AND status IN ('finalized','sent')",
                              (now, invoice_id))
+    with dbmod.transaction(conn):
+        log_activity(conn, invoice_id, "email_failed" if error else "email_sent", error or recipient)
     if error:
         raise BusinessError(f"Email was not sent: {error}")
     return {"recipient": recipient, "message_id": message_id, "sent_at": now}
@@ -390,6 +425,7 @@ def mark_paid(conn, invoice_id, amount, paid_date):
     with dbmod.transaction(conn):
         conn.execute("UPDATE invoices SET status='paid', paid_amount=?, paid_date=?, updated_at=? WHERE id=?",
                      (dec_str(amt), parsed.isoformat(), dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), invoice_id))
+        log_activity(conn, invoice_id, "paid", parsed.isoformat())
 
 
 def mark_unpaid(conn, invoice_id):
@@ -401,6 +437,7 @@ def mark_unpaid(conn, invoice_id):
     with dbmod.transaction(conn):
         conn.execute("UPDATE invoices SET status=?, paid_amount=NULL, paid_date=NULL, updated_at=? WHERE id=?",
                      (new_status, dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), invoice_id))
+        log_activity(conn, invoice_id, "reopened", new_status)
 
 
 def cancel(conn, invoice_id, reason):
@@ -413,6 +450,7 @@ def cancel(conn, invoice_id, reason):
     with dbmod.transaction(conn):
         conn.execute("UPDATE invoices SET status='cancelled', cancel_reason=?, updated_at=? WHERE id=?",
                      (reason[:300], dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), invoice_id))
+        log_activity(conn, invoice_id, "cancelled", reason[:300])
 
 
 def duplicate(conn, invoice_id, settings):

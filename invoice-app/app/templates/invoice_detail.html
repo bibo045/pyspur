@@ -16,9 +16,11 @@
     </p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
+    {% if inv['status'] != 'cancelled' %}<a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_review', invoice_id=inv['id']) }}">{{ icon('eye') }} Preview</a>{% endif %}
     <a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">{{ icon('download') }} PDF</a>
     <a class="{{ btn('secondary') }}" href="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}" target="_blank" rel="noopener">{{ icon('printer') }} Print</a>
     {% if open_unpaid or inv['status'] == 'paid' %}
+      {% if open_unpaid %}<a class="{{ btn('primary') }}" href="{{ url_for('web.invoice_send', invoice_id=inv['id']) }}">{{ icon('send') }} Send</a>{% endif %}
       <button class="{{ btn('primary') if open_unpaid }} {{ btn('secondary') if not open_unpaid }}" data-dialog-open="pay-dialog">{{ icon('wallet') }} {{ 'Mark as paid' if open_unpaid else 'Payment details' }}</button>
     {% endif %}
     {% call dropdown("More actions") %}
@@ -103,24 +105,28 @@
     {% endif %}
 
     <section class="card p-5" aria-labelledby="hist-h">
-      <h2 id="hist-h" class="text-sm font-semibold">History</h2>
-      <ol class="mt-4 space-y-4 border-l border-border pl-4 text-sm">
-        <li class="relative"><span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-primary"></span><p class="font-medium">Finalized</p><p class="text-xs text-muted-foreground">{{ inv['finalized_at']|datetime if inv['finalized_at'] else '—' }}</p></li>
-        {% for e in emails %}
+      <h2 id="hist-h" class="text-sm font-semibold">Status</h2>
+      {% set steps = [('Created', True), ('Finalized', inv['status'] != 'draft' and inv['status'] != 'cancelled'), ('Sent', inv['status'] in ('sent', 'paid') or effective_status == 'overdue'), ('Paid', inv['status'] == 'paid')] %}
+      <ol class="mt-4 flex items-center justify-between gap-1" aria-label="Invoice progress">
+        {% for label, done in steps %}
+        <li class="flex flex-1 flex-col items-center gap-1.5 text-center text-[11px] {{ 'text-foreground' if done else 'text-muted-foreground' }}">
+          <span class="grid h-7 w-7 place-items-center rounded-full {{ 'bg-primary text-primary-foreground' if done else 'border border-border-strong bg-surface' }}">{{ icon('check', 'h-3.5 w-3.5') if done }}</span>
+          {{ label }}
+        </li>
+        {% endfor %}
+      </ol>
+      <h3 class="mb-2 mt-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">Activity</h3>
+      <ol class="space-y-3.5 border-l border-border pl-4 text-sm">
+        {% for a in activity %}
           <li class="relative">
-            <span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full {{ 'bg-success' if e['status'] == 'sent' else 'bg-destructive' }}"></span>
-            {% if e['status'] == 'sent' %}
-              <p class="font-medium">Emailed to {{ e['recipient'] }}</p>
-            {% else %}
-              <p class="font-medium text-destructive">Email failed</p>
-              <p class="text-xs text-muted-foreground">{{ e['error'] }}</p>
-            {% endif %}
-            <p class="text-xs text-muted-foreground">{{ e['attempted_at']|datetime }}</p>
+            <span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full {{ 'bg-destructive' if a['kind'] in ('email_failed','cancelled') else 'bg-success' if a['kind'] == 'paid' else 'bg-primary' }}"></span>
+            <p class="font-medium">{{ {'finalized': 'Finalized', 'email_sent': 'Emailed to ' ~ a['detail'], 'email_failed': 'Email failed', 'whatsapp_shared': 'Shared on WhatsApp', 'paid': 'Marked as paid', 'reopened': 'Reopened as unpaid', 'cancelled': 'Cancelled'}.get(a['kind'], a['kind']) }}</p>
+            {% if a['kind'] == 'email_failed' %}<p class="text-xs text-destructive">{{ a['detail'] }}</p>{% endif %}
+            <p class="text-xs text-muted-foreground">{{ a['at']|datetime }}</p>
           </li>
         {% else %}
-          <li class="text-muted-foreground">Not emailed yet.</li>
+          <li class="text-muted-foreground">No activity yet.</li>
         {% endfor %}
-        {% if inv['paid_date'] %}<li class="relative"><span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-success"></span><p class="font-medium">Paid</p><p class="text-xs text-muted-foreground">{{ inv['paid_date']|date }}</p></li>{% endif %}
       </ol>
     </section>
   </aside>
