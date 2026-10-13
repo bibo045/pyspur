@@ -57,27 +57,36 @@ def test_email_send_records_activity_and_confirmation(client, smtp):
     assert b"Emailed to" in detail.data
 
 
-def test_whatsapp_share_creates_public_link_and_opens_chat(client):
+def test_send_screen_offers_pdf_share_without_phone_number(client):
     inv_id = _setup(client)
     assert _finalize(client, inv_id)["ok"]
-    r = client.post(f"/invoices/{inv_id}/send/whatsapp")
-    assert r.status_code == 302
-    assert r.headers["Location"].startswith("https://wa.me/32470000000?text=")
-    row = dbmod.connect().execute("SELECT share_token FROM invoices WHERE id=?", (inv_id,)).fetchone()
-    assert row["share_token"]
-    public = client.get(f"/share/{row['share_token']}.pdf")
-    assert public.status_code == 200 and public.data[:5] == b"%PDF-"
-    assert client.get("/share/not-a-real-token.pdf").status_code == 404
+    page = client.get(f"/invoices/{inv_id}/send")
+    assert page.status_code == 200
+    assert b'id="share-pdf"' in page.data
+    assert b"wa.me" not in page.data
+    assert b"Add phone number" not in page.data
 
 
-def test_whatsapp_requires_phone_number(client):
+def test_shared_pdf_is_recorded_in_activity(client):
     inv_id = _setup(client)
     assert _finalize(client, inv_id)["ok"]
-    conn = dbmod.connect()
-    conn.execute("UPDATE clients SET phone='' WHERE id=(SELECT client_id FROM invoices WHERE id=?)", (inv_id,))
-    conn.close()
-    r = client.post(f"/invoices/{inv_id}/send/whatsapp", follow_redirects=True)
-    assert b"Add the client" in r.data
+    r = client.post(f"/invoices/{inv_id}/send/shared", json={"channel": "share"})
+    assert r.status_code == 200 and r.get_json()["ok"]
+    detail = client.get(f"/invoices/{inv_id}")
+    assert b"Shared PDF via phone share sheet" in detail.data
+
+
+def test_share_log_refused_for_drafts(client):
+    inv_id = _setup(client)
+    r = client.post(f"/invoices/{inv_id}/send/shared", json={"channel": "share"})
+    assert r.status_code == 409
+
+
+def test_pdf_download_is_available_for_sharing(client):
+    inv_id = _setup(client)
+    assert _finalize(client, inv_id)["ok"]
+    r = client.get(f"/invoices/{inv_id}/download")
+    assert r.status_code == 200 and r.data[:5] == b"%PDF-"
 
 
 def test_share_link_refused_for_drafts(client):

@@ -34,19 +34,64 @@
       <p class="text-xs text-muted-foreground">The invoice is marked as sent only when your email provider accepts it.</p>
     </form>
 
-    <!-- WhatsApp share -->
-    <form method="post" action="{{ url_for('web.invoice_send_whatsapp', invoice_id=inv['id']) }}" class="rounded-2xl border border-border bg-surface p-4 space-y-3" data-once>
+    <!-- Share the PDF: the phone's share sheet attaches it, and the user picks WhatsApp and the contact -->
+    <div class="rounded-2xl border border-border bg-surface p-4 space-y-3" id="share-card">
       <div class="flex items-center gap-3">
         <span class="grid h-10 w-10 place-items-center rounded-xl bg-success-soft text-success">{{ icon('send', 'h-5 w-5') }}</span>
-        <div class="min-w-0"><p class="font-medium">WhatsApp</p>
-          <p class="text-xs text-muted-foreground">{{ 'Opens WhatsApp with a link to the PDF.' if has_phone else 'Add the client’s phone number first.' }}</p></div>
+        <div class="min-w-0"><p class="font-medium">Share PDF</p>
+          <p class="text-xs text-muted-foreground">Opens your phone’s share sheet with the PDF attached. Pick WhatsApp, then the chat you want.</p></div>
       </div>
-      {% if not public_base %}
-        <p class="text-xs text-muted-foreground">Set PUBLIC_BASE_URL on the server so the link works on the client’s phone.</p>
-      {% endif %}
-      <button class="{{ btn('secondary', 'lg') }} w-full" type="submit" {{ 'disabled' if not has_phone }}>Share on WhatsApp</button>
-      {% if not has_phone %}<a class="block text-center text-sm underline" href="{{ url_for('web.client_form', client_id=inv['client_id']) }}">Add phone number</a>{% endif %}
-    </form>
+      <button class="{{ btn('secondary', 'lg') }} w-full" type="button" id="share-pdf"
+        data-pdf="{{ url_for('web.invoice_download', invoice_id=inv['id']) }}"
+        data-name="{{ inv['number'] }}.pdf" data-log="{{ url_for('web.invoice_send_shared', invoice_id=inv['id']) }}"
+        data-title="Invoice {{ inv['number'] }}">Share PDF</button>
+      <p id="share-msg" class="text-xs text-muted-foreground" role="status" aria-live="polite"></p>
+    </div>
   </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const btn = document.getElementById("share-pdf");
+  const msg = document.getElementById("share-msg");
+  if (!btn) return;
+  const say = t => { msg.textContent = t; };
+  // Web Share with files needs a secure page and a phone browser. Where it is missing, download the PDF instead.
+  async function log(channel) {
+    try {
+      await fetch(btn.dataset.log, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel }) });
+    } catch (e) { /* the share itself already happened; a failed log is not shown as an error */ }
+  }
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    say("Preparing the PDF…");
+    try {
+      const res = await fetch(btn.dataset.pdf, { cache: "no-store" });
+      if (!res.ok) throw new Error("The PDF could not be created. Try again.");
+      const blob = await res.blob();
+      const file = new File([blob], btn.dataset.name, { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: btn.dataset.title });
+        await log("share");
+        say("Shared. The app records that the PDF was sent from your phone.");
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = btn.dataset.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        await log("download");
+        say("Downloaded. Attach the file in WhatsApp and choose the chat.");
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") say("Sharing was cancelled. Nothing was sent.");
+      else say(err && err.message ? err.message : "Sharing failed. Try again.");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}

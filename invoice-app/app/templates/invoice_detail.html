@@ -120,7 +120,7 @@
         {% for a in activity %}
           <li class="relative">
             <span class="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full {{ 'bg-destructive' if a['kind'] in ('email_failed','cancelled') else 'bg-success' if a['kind'] == 'paid' else 'bg-primary' }}"></span>
-            <p class="font-medium">{{ {'finalized': 'Finalized', 'email_sent': 'Emailed to ' ~ a['detail'], 'email_failed': 'Email failed', 'whatsapp_shared': 'Shared on WhatsApp', 'paid': 'Marked as paid', 'reopened': 'Reopened as unpaid', 'cancelled': 'Cancelled'}.get(a['kind'], a['kind']) }}</p>
+            <p class="font-medium">{{ {'finalized': 'Finalized', 'email_sent': 'Emailed to ' ~ a['detail'], 'email_failed': 'Email failed', 'whatsapp_shared': 'Shared on WhatsApp', 'pdf_shared': a['detail'], 'paid': 'Marked as paid', 'reopened': 'Reopened as unpaid', 'cancelled': 'Cancelled'}.get(a['kind'], a['kind']) }}</p>
             {% if a['kind'] == 'email_failed' %}<p class="text-xs text-destructive">{{ a['detail'] }}</p>{% endif %}
             <p class="text-xs text-muted-foreground">{{ a['at']|datetime }}</p>
           </li>

@@ -52,14 +52,6 @@ def ensure_share_token(conn, invoice_id):
     return conn.execute("SELECT share_token FROM invoices WHERE id=?", (invoice_id,)).fetchone()[0]
 
 
-def whatsapp_link(phone, message):
-    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
-    if not digits:
-        raise BusinessError("Add the client's phone number (with country code) to share on WhatsApp.")
-    from urllib.parse import quote
-    return f"https://wa.me/{digits}?text={quote(message)}"
-
-
 def parse_date(value, field):
     try:
         return dt.date.fromisoformat(str(value))

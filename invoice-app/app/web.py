@@ -329,7 +329,7 @@ def invoice_send(invoice_id):
         return redirect(url_for("web.invoice_edit", invoice_id=invoice_id))
     subject, body = inv.render_email(settings(), g.db, invoice_id)
     return render_template("invoice_send.html", inv=row, subject=subject, body=body,
-                           has_phone=bool(row["client_phone"]), mail_ready=mailer.is_configured(),
+                           mail_ready=mailer.is_configured(),
                            public_base=os.environ.get("PUBLIC_BASE_URL", ""))
 
 
@@ -345,24 +345,20 @@ def invoice_send_email(invoice_id):
     return redirect(url_for("web.invoice_sent", invoice_id=invoice_id, via="email", to=result["recipient"]))
 
 
-@bp.post("/invoices/<int:invoice_id>/send/whatsapp")
-def invoice_send_whatsapp(invoice_id):
-    row = g.db.execute("SELECT i.*, c.phone AS client_phone FROM invoices i LEFT JOIN clients c ON c.id = i.client_id WHERE i.id=?",
-                       (invoice_id,)).fetchone()
+@bp.post("/invoices/<int:invoice_id>/send/shared")
+def invoice_send_shared(invoice_id):
+    """Called by the send screen after the phone's share sheet finishes with the PDF.
+    The app cannot see who the PDF went to, so the record says only that a share happened."""
+    row = g.db.execute("SELECT id, status FROM invoices WHERE id=?", (invoice_id,)).fetchone()
     if row is None:
-        abort(404)
-    base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-    try:
-        token = inv.ensure_share_token(g.db, invoice_id)
-        link = f"{base}/share/{token}.pdf" if base else url_for("web.public_pdf", token=token, _external=True)
-        message = f"Hi, here is invoice {row['number']} for {row['total']} {row['currency']}, due {row['due_date']}: {link}"
-        target = inv.whatsapp_link(row["client_phone"], message)
-    except inv.BusinessError as e:
-        flash(str(e), "error")
-        return redirect(url_for("web.invoice_send", invoice_id=invoice_id))
+        return jsonify({"ok": False, "error": "Invoice not found."}), 404
+    if row["status"] == "draft":
+        return jsonify({"ok": False, "error": "Finalize the invoice before sharing it."}), 409
+    channel = (request.get_json(silent=True) or {}).get("channel", "share")
+    label = "Shared PDF via phone share sheet" if channel == "share" else "Downloaded PDF to share"
     with dbmod.transaction(g.db):
-        inv.log_activity(g.db, invoice_id, "whatsapp_shared", row["client_phone"])
-    return redirect(target)
+        inv.log_activity(g.db, invoice_id, "pdf_shared", label)
+    return jsonify({"ok": True})
 
 
 @bp.get("/invoices/<int:invoice_id>/sent")
